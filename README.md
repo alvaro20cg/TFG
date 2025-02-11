@@ -1,1 +1,3 @@
 Código TFG
+
+npm start
