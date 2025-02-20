@@ -1,0 +1,39 @@
+/* Contenedor principal con fondo */
+.user-results-container {
+    background: url('../assets/images/fondo.png') no-repeat center center/cover;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+  
+  /* Overlay opcional para suavizar el fondo */
+  .user-results-container::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: -1;
+  }
+  
+  /* Botón de "Ver Resultados" con estilo flow femenino */
+  .view-results-btn {
+    background: linear-gradient(135deg, #ff9a9e, #fad0c4);
+    color: #fff;
+    font-size: 20px;
+    border: none;
+    border-radius: 30px;
+    padding: 12px 30px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .view-results-btn:hover {
+    background: linear-gradient(135deg, #fad0c4, #ff9a9e);
+    transform: scale(1.05);
+  }
+  

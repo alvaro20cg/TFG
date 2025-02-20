@@ -1,11 +1,19 @@
 import React from 'react';
-import '../App.css';
+import Header from '../components/Header';
+import './RealizarTest.css';
+
 const RealizarTest = () => {
   return (
-    <div>
-      <h2>Realizar Test</h2>
-      <p>Aquí se implementará la funcionalidad para realizar el test.</p>
-    </div>
+    <>
+      <Header />
+      <div className="realizar-test-container">
+        <h2>Realizar Test</h2>
+        <div className="test-content">
+          <p>Aquí se mostrarán las preguntas del test.</p>
+          <button className="test-btn">Iniciar Test</button>
+        </div>
+      </div>
+    </>
   );
 };
 
