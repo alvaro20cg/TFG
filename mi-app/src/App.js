@@ -4,7 +4,8 @@ import MainPage from './pages/MainPage';
 import Admin from './pages/Admin';
 import RegisterPatient from './pages/RegisterPatient';
 import RealizarTest from './pages/RealizarTest';
-import UserResults from './pages/UserResults';  
+import UserResults from './pages/UserResults';
+import ViewPatients from './pages/ViewPatients';  // Importa la nueva página
 import './App.css';
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
         <Route path="/register-patient" element={<RegisterPatient />} />
         <Route path="/realizar-test" element={<RealizarTest />} />
         <Route path="/userresults" element={<UserResults />} />
+        <Route path="/view-patients" element={<ViewPatients />} />  {/* Nueva ruta para ver pacientes */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

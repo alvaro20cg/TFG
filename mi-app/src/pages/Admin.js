@@ -14,6 +14,10 @@ const Admin = () => {
     navigate('/realizar-test');
   };
 
+  const goToViewPatients = () => {
+    navigate('/view-patients');
+  };
+
   return (
     <>
       <Header />
@@ -26,6 +30,9 @@ const Admin = () => {
           </button>
           <button className="admin-btn" onClick={goToRealizarTest}>
             Realizar Test
+          </button>
+          <button className="admin-btn" onClick={goToViewPatients}>
+            Ver Pacientes
           </button>
         </div>
       </div>

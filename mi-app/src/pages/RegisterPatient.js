@@ -7,12 +7,11 @@ import './RegisterPatient.css';
 const RegisterPatient = () => {
   const navigate = useNavigate();
 
-  // Estados para los campos del formulario
+  // Estados para los campos del formulario (sin contraseña)
   const [username, setUsername] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [popupMessage, setPopupMessage] = useState('');
   const [showPopup, setShowPopup] = useState(false);
 
@@ -21,55 +20,48 @@ const RegisterPatient = () => {
     setPopupMessage('');
   };
 
-  // Validación básica del email
+  // Función para validar el email
   const validateEmail = (email) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(email);
   };
 
-  // Validación de la contraseña: mínimo 8 caracteres, al menos una mayúscula, una minúscula y un número.
-  const validatePassword = (password) => {
-    const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
-    return regex.test(password);
-  };
-
-  // Función para capitalizar nombres: primera letra en mayúscula, el resto en minúscula.
+  // Función para capitalizar nombres y apellidos: primera letra mayúscula, resto minúsculas.
   const capitalize = (str) => {
     if (!str) return '';
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
   };
 
+  // Función para generar una contraseña aleatoria (ejemplo de 8 caracteres)
+  const generatePassword = () => {
+    return Math.random().toString(36).slice(-8);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Verificar que todos los campos estén completos
-    if (!username || !firstName || !lastName || !email || !password) {
+    // Validación de campos requeridos
+    if (!username || !firstName || !lastName || !email) {
       setPopupMessage('Por favor, completa todos los campos.');
       setShowPopup(true);
       return;
     }
 
-    // Validar el correo electrónico
+    // Validación del correo electrónico
     if (!validateEmail(email)) {
       setPopupMessage('El correo electrónico no es válido.');
       setShowPopup(true);
       return;
     }
 
-    // Validar la contraseña
-    if (!validatePassword(password)) {
-      setPopupMessage(
-        'La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número.'
-      );
-      setShowPopup(true);
-      return;
-    }
-    
-    // Capitalizar el primer nombre y apellido
+    // Capitalizar nombres y apellidos
     const formattedFirstName = capitalize(firstName);
     const formattedLastName = capitalize(lastName);
 
-    // Insertar el registro en la tabla "users"
+    // Generar la contraseña automáticamente
+    const generatedPassword = generatePassword();
+
+    // Insertar en la tabla "users" (la tabla ya debe estar creada en Supabase)
     const { data, error } = await supabase
       .from('users')
       .insert([
@@ -78,21 +70,24 @@ const RegisterPatient = () => {
           first_name: formattedFirstName,
           last_name: formattedLastName,
           email,
-          password, // En producción, se debe hashear la contraseña
+          password: generatedPassword, // En producción, hashea la contraseña antes de guardarla.
+          role: 'user'  // Asumimos que el nuevo usuario es "user"
         },
-      ]);
+      ])
+      .single();
 
     if (error) {
       console.error('Error al registrar paciente:', error);
       setPopupMessage('Error al registrar paciente: ' + error.message);
     } else {
-      setPopupMessage('Paciente registrado con éxito.');
+      setPopupMessage(
+        'Paciente registrado con éxito.\nLa contraseña generada es: ' + generatedPassword
+      );
       // Limpiar el formulario
       setUsername('');
       setFirstName('');
       setLastName('');
       setEmail('');
-      setPassword('');
     }
     setShowPopup(true);
   };
@@ -138,20 +133,12 @@ const RegisterPatient = () => {
           onChange={(e) => setEmail(e.target.value)}
         />
 
-        <label htmlFor="password">Contraseña:</label>
-        <input
-          type="password"
-          id="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
         <button type="submit" className="register-btn">
           Registrar
         </button>
       </form>
       <button className="back-btn" onClick={handleBack}>
-        Aceptar
+        Atrás
       </button>
 
       {showPopup && (
