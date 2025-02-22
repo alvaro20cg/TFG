@@ -10,8 +10,8 @@ const Admin = () => {
     navigate('/register-patient');
   };
 
-  const goToRealizarTest = () => {
-    navigate('/realizar-test');
+  const goToConfigurarTest = () => {
+    navigate('/configurar-test'); // Actualiza la ruta a 'configurar-test'
   };
 
   const goToViewPatients = () => {
@@ -28,8 +28,8 @@ const Admin = () => {
           <button className="admin-btn" onClick={goToRegisterPatient}>
             Registrar Paciente
           </button>
-          <button className="admin-btn" onClick={goToRealizarTest}>
-            Realizar Test
+          <button className="admin-btn" onClick={goToConfigurarTest}>
+            Configurar Test {/* Cambiado de "Realizar Test" a "Configurar Test" */}
           </button>
           <button className="admin-btn" onClick={goToViewPatients}>
             Ver Pacientes

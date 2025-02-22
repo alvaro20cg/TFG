@@ -24,6 +24,15 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Verificar si la configuración de nodemailer está funcionando correctamente
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('Error en la configuración de nodemailer:', error);
+  } else {
+    console.log('La configuración de nodemailer es exitosa:', success);
+  }
+});
+
 // Función para generar una contraseña aleatoria (8 caracteres hexadecimales)
 function generatePassword() {
   return crypto.randomBytes(4).toString('hex');
@@ -38,11 +47,22 @@ app.post('/api/register-patient', async (req, res) => {
     return res.status(400).json({ message: 'Faltan campos requeridos.' });
   }
 
+  // Verificar si el correo electrónico ya está registrado
+  const { data, error: existingUserError } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .single();
+
+  if (data) {
+    return res.status(409).json({ message: 'El correo electrónico ya está registrado.' });
+  }
+
   // Generar la contraseña aleatoria
   const password = generatePassword();
 
   // Insertar en la tabla "users" (asegúrate de que la tabla tenga las columnas: username, first_name, last_name, email, password, role)
-  const { data, error } = await supabase
+  const { data: newUser, error: insertError } = await supabase
     .from('users')
     .insert([{
       username,
@@ -54,9 +74,9 @@ app.post('/api/register-patient', async (req, res) => {
     }])
     .single();
 
-  if (error) {
-    console.error('Error registrando paciente:', error);
-    return res.status(500).json({ message: 'Error al registrar paciente', error: error.message });
+  if (insertError) {
+    console.error('Error registrando paciente:', insertError);
+    return res.status(500).json({ message: 'Error al registrar paciente', error: insertError.message });
   }
 
   // Configurar el correo a enviar
@@ -75,7 +95,7 @@ app.post('/api/register-patient', async (req, res) => {
       console.error('Error enviando correo:', err);
       return res.status(500).json({ message: 'Error al enviar el correo', error: err.message });
     }
-    return res.json({ message: 'Paciente registrado con éxito y correo enviado.', data });
+    return res.json({ message: 'Paciente registrado con éxito y correo enviado.', data: newUser });
   });
 });
 

@@ -1,0 +1,59 @@
+.testpage-container {
+  background: url('../assets/images/fondo.png') no-repeat center center/cover;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+  }
+
+  .instructions {
+    margin-bottom: 20px;
+  }
+  
+  .images-container {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .image-option {
+    cursor: pointer;
+    transition: transform 0.3s ease;
+  }
+  
+  .image-option:hover {
+    transform: scale(1.1);
+  }
+  
+  .reaction-time {
+    margin-top: 20px;
+    font-size: 1.2em;
+  }
+  
+  .result {
+    margin-top: 20px;
+    font-size: 1.5em;
+  }
+  
+  .next-round {
+    margin-top: 20px;
+  }
+  
+  .next-button {
+    padding: 10px 20px;
+    font-size: 1.2em;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+  
+  .next-button:hover {
+    background-color: #45a049;
+  }
+  
