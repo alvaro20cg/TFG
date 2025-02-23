@@ -1,18 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:wght@300;400;700&display=swap");
-
-/* Estilos básicos globales */
-*,
-*:after,
-*:before {
-  box-sizing: border-box;
-}
-
-/* Body */
-body {
-  font-family: "Averia Serif Libre", cursive;
-  background-color: rgb(19, 18, 21);
-  color: #ffffff;
-}
 
 /* Fondo y diseño general de la página */
 .realizar-test-container {
@@ -25,6 +10,7 @@ body {
   position: relative;
   z-index: 1;
 }
+
 
 /* Overlay para suavizar el fondo */
 .realizar-test-container::before {
@@ -182,7 +168,7 @@ body {
   height: 19px;
   width: 19px;
   border: 2px solid #ff69b4;
-  left: 22px;
+  left: 20px;
   top: 50%;
   transform: translateY(-50%);
 }

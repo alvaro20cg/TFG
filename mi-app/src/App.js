@@ -5,7 +5,7 @@ import Admin from './pages/Admin';
 import RegisterPatient from './pages/RegisterPatient';
 import ConfigurarTest from './pages/ConfigurarTest';
 import UserResults from './pages/UserResults';
-import ViewPatients from './pages/ViewPatients';  
+import ViewPatients from './pages/ViewPatients';
 import TestPage from './pages/TestPage';
 import './App.css';
 
@@ -19,8 +19,8 @@ function App() {
         <Route path="/configurar-test" element={<ConfigurarTest />} />
         <Route path="/userresults" element={<UserResults />} />
         <Route path="/view-patients" element={<ViewPatients />} />
-        <Route path="*" element={<Navigate to="/" />} />
         <Route path="/test" element={<TestPage />} /> {/* Ruta correcta para TestPage */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );

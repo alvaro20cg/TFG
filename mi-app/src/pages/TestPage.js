@@ -1,77 +1,119 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import './TestPage.css'; // Asegúrate de tener el archivo de estilo
+import './TestPage.css';
 
 const TestPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  
-  // Extraer los datos enviados desde la página anterior (ConfigurarTest)
-  const { images, correctPerson, startTime } = location.state || {};
-  
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [endTime, setEndTime] = useState(null);
-  const [reactionTime, setReactionTime] = useState(null);
-  const [isCorrect, setIsCorrect] = useState(null);
-  
-  const handleImageSelection = (image) => {
-    setSelectedImage(image);
-    setEndTime(Date.now()); // Registra el tiempo de finalización
+  const state = location.state;
+
+  const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
+  const [roundStartTime, setRoundStartTime] = useState(Date.now());
+  const [positions, setPositions] = useState([]);
+
+  // Redirige si no hay state
+  useEffect(() => {
+    if (!state) {
+      navigate('/');
+    }
+  }, [state, navigate]);
+
+  // Valores predeterminados
+  const rounds = state?.rounds || [];
+  const totalRounds = rounds.length;
+  const currentRoundData = rounds[currentRoundIndex] || { images: [] };
+  const images = currentRoundData.images;
+  const startTime = state?.startTime || Date.now();
+
+  // Pre-cargar imágenes de la ronda actual
+  useEffect(() => {
+    images.forEach(imgData => {
+      const img = new Image();
+      img.src = imgData.url;
+    });
+  }, [images]);
+
+  // Genera posiciones sin solapamiento con imágenes de 15% de ancho y alto
+  const generateNonOverlappingPositions = () => {
+    const positions = [];
+    const maxAttempts = 1000;
+    const imageWidthPercent = 10;  // Ajusta según el tamaño deseado
+    const imageHeightPercent = 25;
+    const containerWidth = 100;
+    const containerHeight = 80;
+
+    for (let i = 0; i < images.length; i++) {
+      let attempt = 0;
+      let position;
+      let overlapping = true;
+      while (overlapping && attempt < maxAttempts) {
+        const top = Math.random() * (containerHeight - imageHeightPercent);
+        const left = Math.random() * (containerWidth - imageWidthPercent);
+        position = { top, left, width: imageWidthPercent, height: imageHeightPercent };
+
+        overlapping = positions.some(pos => {
+          return !(
+            (left + imageWidthPercent <= parseFloat(pos.left)) ||
+            (left >= parseFloat(pos.left) + parseFloat(pos.width)) ||
+            (top + imageHeightPercent <= parseFloat(pos.top)) ||
+            (top >= parseFloat(pos.top) + parseFloat(pos.height))
+          );
+        });
+        attempt++;
+      }
+      positions.push({
+        top: `${position.top}%`,
+        left: `${position.left}%`,
+        width: `${imageWidthPercent}%`,
+        height: `${imageHeightPercent}%`
+      });
+    }
+    return positions;
   };
 
   useEffect(() => {
-    if (selectedImage && endTime) {
-      const reaction = (endTime - startTime) / 1000;
-      setReactionTime(reaction);
-      console.log(`Tiempo de reacción: ${reaction} segundos`);
+    setPositions(generateNonOverlappingPositions());
+    setRoundStartTime(Date.now());
+  }, [currentRoundIndex, images]);
 
-      if (selectedImage.id === correctPerson) {
-        setIsCorrect(true);
-      } else {
-        setIsCorrect(false);
-      }
+  const handleImageClick = (img) => {
+    const clickTime = Date.now();
+    const reactionTime = clickTime - roundStartTime;
+    console.log(
+      `Imagen ${img.id} clickeada en la ronda ${currentRoundIndex + 1}. Tiempo de reacción: ${reactionTime} ms`
+    );
+    
+    if (currentRoundIndex < totalRounds - 1) {
+      setCurrentRoundIndex(currentRoundIndex + 1);
+    } else {
+      alert("Test finalizado");
+      // Aquí podrías redirigir o mostrar resultados
     }
-  }, [selectedImage, endTime, correctPerson, startTime]);
-
-  const handleNextRound = () => {
-    // Redirigir a la página de resultados (o a la siguiente ronda si fuera necesario)
-    navigate('/userresults', { state: { isCorrect, reactionTime } });
   };
+
+  if (!state) return null;
 
   return (
     <div className="testpage-container">
-      <h2>Test Psicológico: Identifica la emoción</h2>
-      
-      <div className="instructions">
-        <p>Selecciona la imagen que crees que refleja la emoción correcta.</p>
-      </div>
-      
-      <div className="images-container">
-        {images && images.map((image) => (
-          <div 
-            key={image.id} 
-            className="image-option"
-            onClick={() => handleImageSelection(image)}
-          >
-            <img src={image.url} alt={`Persona ${image.id}`} />
-          </div>
+      <h2>Ronda {currentRoundIndex + 1} / {totalRounds}</h2>
+      <div 
+        className="images-container" 
+        style={{ position: 'relative', height: '80vh', width: '100%', border: '1px solid #ccc' }}
+      >
+        {images.map((img, index) => (
+          <img
+            key={img.id}
+            src={img.url}
+            alt={`Imagen ${img.id}`}
+            onClick={() => handleImageClick(img)}
+            style={{
+              position: 'absolute',
+              cursor: 'pointer',
+              objectFit: 'cover', // Para mantener la proporción sin distorsión
+              ...positions[index]
+            }}
+          />
         ))}
-      </div>
-
-      {selectedImage && (
-        <div className="reaction-time">
-          <p>Tiempo de reacción: {reactionTime ? `${reactionTime.toFixed(2)} segundos` : 'Esperando respuesta...'}</p>
-        </div>
-      )}
-
-      {isCorrect !== null && (
-        <div className="result">
-          {isCorrect ? <p>¡Correcto!</p> : <p>¡Incorrecto! La persona correcta era {correctPerson}</p>}
-        </div>
-      )}
-
-      <div className="next-round">
-        <button onClick={handleNextRound} className="next-button">Siguiente</button>
       </div>
     </div>
   );

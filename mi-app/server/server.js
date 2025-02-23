@@ -3,6 +3,8 @@ const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const fs = require('fs');
+const https = require('https');
 require('dotenv').config();  // Cargar variables de entorno desde el archivo .env
 
 const app = express();
@@ -15,9 +17,9 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Configuración de nodemailer (usando las credenciales de .env)
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,      // SMTP de Gmail
-  port: process.env.SMTP_PORT || 587, // Puerto TLS (587)
-  secure: process.env.SMTP_SECURE === 'true', // Si usas SSL, usa 465, sino 587 para TLS
+  host: process.env.SMTP_HOST,      // SMTP de Gmail u otro proveedor
+  port: process.env.SMTP_PORT || 587, // Puerto TLS (587) o 465 para SSL
+  secure: process.env.SMTP_SECURE === 'true', // true para SSL, false para TLS
   auth: {
     user: process.env.SMTP_USER, // Tu correo electrónico
     pass: process.env.SMTP_PASS, // Contraseña de aplicación
@@ -61,7 +63,7 @@ app.post('/api/register-patient', async (req, res) => {
   // Generar la contraseña aleatoria
   const password = generatePassword();
 
-  // Insertar en la tabla "users" (asegúrate de que la tabla tenga las columnas: username, first_name, last_name, email, password, role)
+  // Insertar en la tabla "users"
   const { data: newUser, error: insertError } = await supabase
     .from('users')
     .insert([{
@@ -70,7 +72,7 @@ app.post('/api/register-patient', async (req, res) => {
       last_name: lastName,
       email,
       password, // En producción, se debe hashear la contraseña
-      role: 'user', // Asumimos que el nuevo paciente tiene rol "user"
+      role: 'user',
     }])
     .single();
 
@@ -81,7 +83,7 @@ app.post('/api/register-patient', async (req, res) => {
 
   // Configurar el correo a enviar
   const mailOptions = {
-    from: '"Mi App" <no-reply@miapp.com>', // Remitente, puedes cambiar esto
+    from: '"Mi App" <no-reply@miapp.com>', // Remitente
     to: email,
     subject: 'Tu contraseña para Mi App',
     html: `<p>Hola ${firstName},</p>
@@ -99,8 +101,15 @@ app.post('/api/register-patient', async (req, res) => {
   });
 });
 
-// Inicia el servidor
+// Configura el servidor HTTPS
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en el puerto ${PORT}`);
+
+// Lee el certificado y la llave (asegúrate de que estos archivos existan)
+const options = {
+  key: fs.readFileSync('key.pem'),
+  cert: fs.readFileSync('cert.pem'),
+};
+
+https.createServer(options, app).listen(PORT, () => {
+  console.log(`Servidor HTTPS corriendo en https://localhost:${PORT}`);
 });
