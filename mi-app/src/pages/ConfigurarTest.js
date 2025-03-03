@@ -1,24 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import { useNavigate } from 'react-router-dom';
+import supabase from '../supabaseClient';
 import './ConfigurarTest.css';
 import imagenesData from '../json/imagenes.json';
 
-const emotions = [
-  "Alegría", "Tristeza", "Enfado", "Asco", "Sorpresa", "Neutral"
-];
-
+const emotions = ["Alegría", "Tristeza", "Enfado", "Asco", "Sorpresa", "Neutral"];
 const people = ['004', '066', '079', '116', '140', '168'];
+
+// Mapeo de emoción a la letra que aparece en el nombre del archivo
+const emotionMapping = {
+  "Alegría": "h",
+  "Tristeza": "s",
+  "Enfado": "f",
+  "Asco": "d",
+  "Sorpresa": "a",
+  "Neutral": "n"
+};
 
 const ConfigurarTest = () => {
   const navigate = useNavigate();
 
+  // Estados para la selección de pacientes
+  const [patients, setPatients] = useState([]);
+  const [selectedPatient, setSelectedPatient] = useState("");
+  const [error, setError] = useState(null);
+
+  // Otros estados para la configuración del test
   const [selectedPeople, setSelectedPeople] = useState([]);
   const [selectedEmotion, setSelectedEmotion] = useState("");
-  const [numRounds, setNumRounds] = useState(1);
+  const [numRounds, setNumRounds] = useState("");
+  const [selectedVersion, setSelectedVersion] = useState("");
+  const [selectedDifficulty, setSelectedDifficulty] = useState("");
 
-  // Selección de carpetas (personas)
+  // Cargar pacientes desde Supabase
+  useEffect(() => {
+    const fetchPatients = async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, email, role')
+        .eq('role', 'user');
+
+      if (error) {
+        console.error('Error fetching patients:', error);
+        setError(error.message);
+      } else {
+        setPatients(data);
+      }
+    };
+    fetchPatients();
+  }, []);
+
+  // Manejo de selección/deselección de carpetas (personas)
   const handlePersonSelection = (person) => {
-    setSelectedPeople((prevState) => {
+    setSelectedPeople(prevState => {
       if (prevState.includes(person)) {
         return prevState.filter(p => p !== person);
       } else {
@@ -27,63 +61,167 @@ const ConfigurarTest = () => {
     });
   };
 
-  // Selección de emoción
+  // Manejo de la selección de emoción
   const handleEmotionSelection = (emotion) => {
     setSelectedEmotion(emotion);
   };
 
   // Cambio del número de rondas
   const handleRoundsChange = (event) => {
-    setNumRounds(Number(event.target.value));
+    setNumRounds(event.target.value);
   };
 
-  // Función que obtiene las imágenes del JSON para una carpeta (persona) determinada
-  const getLocalImages = (person) => {
-    const filteredImages = imagenesData.filter(img => img.folder === person);
-    console.log(`Imágenes encontradas para la carpeta ${person}:`, filteredImages);
-    
-    const mappedImages = filteredImages.map(img => ({
+  // Función para obtener la imagen de vista previa de la carpeta
+  const getFolderImage = (person) => {
+    const defaultVersion = "a";
+    const happyImage = imagenesData.find(
+      img =>
+        img.folder === person &&
+        img.file.includes('_h_') &&
+        img.file.endsWith(`_${defaultVersion}.jpg`)
+    );
+    return happyImage ? `/images/${happyImage.folder}/${happyImage.file}` : null;
+  };
+
+  // Función para obtener la imagen target para un folder en base a la emoción elegida y versión
+  const getTargetImage = (folder) => {
+    const targetLetter = emotionMapping[selectedEmotion];
+    const targetImg = imagenesData.find(img => {
+      if (img.folder !== folder) return false;
+      const parts = img.file.split('_');
+      return parts[3] === targetLetter && img.file.endsWith(`_${selectedVersion}.jpg`);
+    });
+    return targetImg ? {
+      id: targetImg.id,
+      url: `/images/${targetImg.folder}/${targetImg.file}`,
+      folder: targetImg.folder
+    } : null;
+  };
+
+  // Función para obtener imágenes distractoras: aquellas cuyo cuarto segmento NO es la letra target
+  const getDistractorImages = (folder) => {
+    const targetLetter = emotionMapping[selectedEmotion];
+    const distractors = imagenesData.filter(img => {
+      if (img.folder !== folder) return false;
+      const parts = img.file.split('_');
+      return parts[3] !== targetLetter;
+    });
+    // Mezcla aleatoria y toma 10 imágenes
+    const shuffled = distractors.sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 10).map(img => ({
       id: img.id,
-      url: `/images/${img.folder}/${img.file}`
+      url: `/images/${img.folder}/${img.file}`,
+      folder: img.folder
     }));
-    console.log(`Imágenes mapeadas para la carpeta ${person}:`, mappedImages);
-    
-    return mappedImages;
   };
 
-  // Función para iniciar el test
-  const iniciarTest = () => {
+  // Función para iniciar el test y generar el JSON de configuración
+  const iniciarTest = async () => {
+    if (!selectedPatient) {
+      alert('Debes seleccionar un usuario.');
+      return;
+    }
     if (selectedPeople.length === 0 || !selectedEmotion) {
       alert('Debes seleccionar al menos una carpeta y una emoción.');
       return;
     }
+    if (!numRounds) {
+      alert('Debes seleccionar el número de rondas.');
+      return;
+    }
+    if (!selectedVersion) {
+      alert('Debes seleccionar una versión.');
+      return;
+    }
+    if (!selectedDifficulty) {
+      alert('Debes seleccionar una dificultad.');
+      return;
+    }
 
-    // Generamos un array de rondas:
-    // Por cada carpeta seleccionada, se crearán "numRounds" rondas.
+    const roundsNumber = parseInt(numRounds, 10);
+    // Se asume que el target es la primera carpeta seleccionada
+    const targetFolder = selectedPeople[0];
     let rounds = [];
-    selectedPeople.forEach(folder => {
-      for (let i = 0; i < numRounds; i++) {
-        rounds.push({
-          correctPerson: folder,
-          images: getLocalImages(folder)
-        });
+    for (let i = 0; i < roundsNumber; i++) {
+      let roundImages = [];
+      if (selectedDifficulty === "facil") {
+        // En modo fácil: 10 distractores + la imagen target.
+        const distractorImgs = getDistractorImages(targetFolder);
+        const targetImg = getTargetImage(targetFolder);
+        roundImages = distractorImgs.concat(targetImg ? [targetImg] : []);
+      } else {
+        // Modo difícil: lógica previa (target + alternativa)
+        let tempImages = imagenesData.filter(img => img.folder === targetFolder)
+          .map(img => ({
+            id: img.id,
+            url: `/images/${img.folder}/${img.file}`,
+            folder: img.folder
+          }));
+        const targetLetter = emotionMapping[selectedEmotion];
+        const targetImgIndex = tempImages.findIndex(img =>
+          img.url.includes(`_${targetLetter}_`) && img.url.endsWith(`_${selectedVersion}.jpg`)
+        );
+        if (targetImgIndex !== -1) {
+          tempImages[targetImgIndex].isCorrect = true;
+        }
+        if (targetImgIndex !== -1) {
+          const targetImg = tempImages[targetImgIndex];
+          let altUrl;
+          if (targetImg.url.includes('_a.jpg')) {
+            altUrl = targetImg.url.replace('_a.jpg', '_b.jpg');
+          } else if (targetImg.url.includes('_b.jpg')) {
+            altUrl = targetImg.url.replace('_b.jpg', '_a.jpg');
+          } else {
+            altUrl = targetImg.url;
+          }
+          const altImg = {
+            id: targetImg.id + "_alt",
+            url: altUrl,
+            folder: targetImg.folder,
+            isCorrect: false
+          };
+          tempImages.push(altImg);
+        }
+        tempImages.sort(() => Math.random() - 0.5);
+        roundImages = tempImages;
       }
-    });
-    
-    // (Opcional) Si deseas aleatorizar el orden de las rondas:
-    rounds = rounds.sort(() => Math.random() - 0.5);
-
+      // Mezcla final de imágenes de la ronda
+      roundImages.sort(() => Math.random() - 0.5);
+      rounds.push({
+        targetFolder,
+        images: roundImages
+      });
+    }
     const startTime = Date.now();
-    console.log('Hora de inicio del test:', startTime);
-    console.log('Rondas generadas:', rounds);
 
-    // Redirige a la ruta /test pasando la configuración completa (array de rondas, emoción y tiempo de inicio)
-    navigate('/test', { 
-      state: { 
-        rounds, 
-        selectedEmotion, 
-        startTime 
-      } 
+    // Insertar el test en Supabase y recuperar el id insertado
+    const { data: insertedTest, error } = await supabase
+      .from('test')
+      .insert([
+        {
+          user_id: selectedPatient,
+          configuration: { rounds, selectedEmotion, selectedDifficulty, startTime },
+          status: 'pendiente'
+        }
+      ])
+      .select(); // Para que se retorne el registro insertado
+
+    if (error) {
+      console.error("Error al guardar la configuración del test", error);
+      alert("Error al guardar la configuración del test");
+      return;
+    }
+    const newTestId = insertedTest[0].id;
+    alert("La configuración del test se ha guardado. Desde tu panel podrás iniciar el test.");
+    // Navegar a TestPage pasando testId y la configuración
+    navigate('/testpage', {
+      state: {
+        testId: newTestId,
+        rounds,
+        selectedEmotion,
+        selectedVersion,
+        selectedDifficulty
+      }
     });
   };
 
@@ -94,29 +232,50 @@ const ConfigurarTest = () => {
         <div className="selection-container">
           <div className="people-selection">
             <h3>Selecciona las carpetas (personas):</h3>
-            {people.map((person) => (
-              <div key={person} className="checkbox-wrapper-62">
-                <input
-                  type="checkbox"
-                  className="check"
-                  id={person}
-                  checked={selectedPeople.includes(person)}
-                  onChange={() => handlePersonSelection(person)}
-                />
-                <label htmlFor={person} className="label">
-                  <svg width="43" height="43" viewBox="0 0 90 90">
-                    <rect x="30" y="20" width="50" height="50" stroke="black" fill="none" />
-                    <g transform="translate(0,-952.36218)">
-                      <path d="m 13,983 c 33,6 40,26 55,48 " stroke="black" strokeWidth="3" className="path1" fill="none" />
-                      <path d="M 75,970 C 51,981 34,1014 25,1031 " stroke="black" strokeWidth="3" className="path1" fill="none" />
-                    </g>
-                  </svg>
-                  <span>{person}</span>
-                </label>
-              </div>
-            ))}
+            {people.map((person) => {
+              const folderImageUrl = getFolderImage(person);
+              return (
+                <div key={person} className="checkbox-wrapper-62">
+                  <input
+                    type="checkbox"
+                    className="check"
+                    id={person}
+                    checked={selectedPeople.includes(person)}
+                    onChange={() => handlePersonSelection(person)}
+                  />
+                  <label htmlFor={person} className="label">
+                    <svg width="43" height="43" viewBox="0 0 90 90">
+                      <rect x="30" y="20" width="50" height="50" stroke="black" fill="none" />
+                      <g transform="translate(0,-952.36218)">
+                        <path
+                          d="m 13,983 c 33,6 40,26 55,48 "
+                          stroke="black"
+                          strokeWidth="3"
+                          className="path1"
+                          fill="none"
+                        />
+                        <path
+                          d="M 75,970 C 51,981 34,1014 25,1031 "
+                          stroke="black"
+                          strokeWidth="3"
+                          className="path1"
+                          fill="none"
+                        />
+                      </g>
+                    </svg>
+                    {folderImageUrl && (
+                      <img
+                        src={folderImageUrl}
+                        alt={`Happy ${person}`}
+                        className="happy-image"
+                      />
+                    )}
+                    <span>{person}</span>
+                  </label>
+                </div>
+              );
+            })}
           </div>
-
           <div className="radio-section">
             <div className="radio-list">
               <h3>Selecciona la emoción</h3>
@@ -136,21 +295,61 @@ const ConfigurarTest = () => {
             </div>
           </div>
         </div>
-        
-        <div className="rounds-selection">
-          <label htmlFor="rounds">Número de rondas:</label>
-          <input
-            type="number"
-            id="rounds"
-            value={numRounds}
-            onChange={handleRoundsChange}
-            min="1"
-            max="10"
-          />
-          <p>(Número de rondas por carpeta)</p>
+        <div className="controls-group">
+          <div className="control-item">
+            <label htmlFor="rounds">Número de rondas:</label>
+            <input
+              type="number"
+              id="rounds"
+              placeholder="Selecciona el número de rondas"
+              value={numRounds}
+              onChange={handleRoundsChange}
+              min="1"
+              max="10"
+            />
+          </div>
+          <div className="control-item">
+            <label htmlFor="version-select">Versión:</label>
+            <select
+              id="version-select"
+              value={selectedVersion}
+              onChange={(e) => setSelectedVersion(e.target.value)}
+            >
+              <option value="">Selecciona la versión</option>
+              <option value="a">A</option>
+              <option value="b">B</option>
+            </select>
+          </div>
+          <div className="control-item">
+            <label htmlFor="difficulty-select">Dificultad:</label>
+            <select
+              id="difficulty-select"
+              value={selectedDifficulty}
+              onChange={(e) => setSelectedDifficulty(e.target.value)}
+            >
+              <option value="">Selecciona la dificultad</option>
+              <option value="facil">Fácil</option>
+              <option value="dificil">Difícil</option>
+            </select>
+          </div>
+          <div className="control-item">
+            <label htmlFor="patient-select">Selecciona el usuario:</label>
+            <select
+              id="patient-select"
+              value={selectedPatient}
+              onChange={(e) => setSelectedPatient(e.target.value)}
+            >
+              <option value="">-- Selecciona un usuario --</option>
+              {patients.map((patient) => (
+                <option key={patient.id} value={patient.id}>
+                  {patient.first_name} {patient.last_name} ({patient.email})
+                </option>
+              ))}
+            </select>
+            {error && <p className="error">{error}</p>}
+          </div>
         </div>
       </div>
-
       <div className="button-container">
         <button onClick={() => navigate(-1)} className="back-btn">Atrás</button>
         <button onClick={iniciarTest} className="start-button">Realizar Test</button>

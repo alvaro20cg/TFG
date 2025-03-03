@@ -19,7 +19,7 @@ function App() {
         <Route path="/configurar-test" element={<ConfigurarTest />} />
         <Route path="/userresults" element={<UserResults />} />
         <Route path="/view-patients" element={<ViewPatients />} />
-        <Route path="/test" element={<TestPage />} /> {/* Ruta correcta para TestPage */}
+        <Route path="/testpage" element={<TestPage />} /> {/* Ruta correcta para TestPage */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

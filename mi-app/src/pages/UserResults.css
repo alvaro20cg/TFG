@@ -1,39 +1,154 @@
-/* Contenedor principal con fondo */
-.user-results-container {
-    background: url('../assets/images/fondo.png') no-repeat center center/cover;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: relative;
-  }
-  
-  /* Overlay opcional para suavizar el fondo */
-  .user-results-container::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    z-index: -1;
-  }
-  
-  /* Botón de "Ver Resultados" con estilo flow femenino */
-  .view-results-btn {
-    background: linear-gradient(135deg, #ff9a9e, #fad0c4);
-    color: #fff;
-    font-size: 20px;
-    border: none;
-    border-radius: 30px;
-    padding: 12px 30px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-  }
-  
-  .view-results-btn:hover {
-    background: linear-gradient(135deg, #fad0c4, #ff9a9e);
-    transform: scale(1.05);
-  }
-  
+/* ----------------------------- */
+/* Estilos del Panel de Usuario  */
+/* ----------------------------- */
+
+/* Contenedor principal del panel */
+.admin-container {
+  background: url('../assets/images/fondo.png') no-repeat center center/cover;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+/* Overlay para suavizar el fondo */
+.admin-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: -1;
+}
+
+/* Título del panel */
+.admin-container h1 {
+  color: #fff;
+  font-size: 3em;
+  margin-bottom: 20px;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Descripción o subtítulo */
+.admin-container p {
+  color: #ffffff;
+  font-size: 1.5em;
+  margin-bottom: 30px;
+  text-shadow: 1px 1px 3px rgba(255, 182, 193, 0.6);
+}
+
+/* Contenedor para los botones */
+.admin-options {
+  display: flex;
+  gap: 20px;
+}
+
+/* Estilos para los botones */
+.admin-btn {
+  background: linear-gradient(135deg, #ff9a9e, #fad0c4); /* degradado rosa pastel */
+  color: #fff;
+  font-size: 18px;
+  border: none;
+  border-radius: 30px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0px 4px 6px rgba(255, 105, 180, 0.3);
+}
+
+.admin-btn:hover {
+  background: linear-gradient(135deg, #fad0c4, #ff9a9e);
+  transform: scale(1.05);
+  box-shadow: 0px 6px 10px rgba(255, 105, 180, 0.4);
+}
+
+/* ----------------------------- */
+/* Estilos para el Modal de Tests */
+/* ----------------------------- */
+
+/* Overlay del modal: cubre toda la ventana con un fondo semitransparente */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 182, 193, 0.4); /* rosa suave */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Contenedor del contenido del modal */
+.modal-content {
+  background: #fff;
+  padding: 20px 30px;
+  border-radius: 15px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 2px 10px rgba(255, 105, 180, 0.3);
+  position: relative;
+  animation: fadeIn 0.5s ease;
+}
+
+/* Animación de entrada */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Lista de tests */
+.tests-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Cada elemento de la lista de tests */
+.test-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #ffe4e1;
+}
+
+/* Botón para iniciar el test */
+.start-test-btn {
+  background: #ff69b4;
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.3s ease;
+}
+
+.start-test-btn:hover {
+  background: #ff1493;
+}
+
+/* Botón para cerrar el modal */
+.close-modal-btn {
+  background: #ff6f91;
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.3s ease;
+  margin-top: 15px;
+  width: 100%;
+}
+
+.close-modal-btn:hover {
+  background: #ff3b70;
+}
