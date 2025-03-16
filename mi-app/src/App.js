@@ -7,6 +7,7 @@ import ConfigurarTest from './pages/ConfigurarTest';
 import UserResults from './pages/UserResults';
 import ViewPatients from './pages/ViewPatients';
 import TestPage from './pages/TestPage';
+import ResetPassword from './pages/ResetPassword'; // Importa la nueva página
 import './App.css';
 
 function App() {
@@ -19,7 +20,8 @@ function App() {
         <Route path="/configurar-test" element={<ConfigurarTest />} />
         <Route path="/userresults" element={<UserResults />} />
         <Route path="/view-patients" element={<ViewPatients />} />
-        <Route path="/testpage" element={<TestPage />} /> {/* Ruta correcta para TestPage */}
+        <Route path="/testpage" element={<TestPage />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

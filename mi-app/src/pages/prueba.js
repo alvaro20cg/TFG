@@ -1,48 +1,106 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import supabase from '../supabaseClient';
 import './TestPage.css';
 
+const emotionMapping = {
+  "Alegría": "h",
+  "Tristeza": "s",
+  "Enfado": "f",
+  "Asco": "d",
+  "Enojo": "a",
+  "Neutral": "n"
+};
+
 const TestPage = () => {
-  const location = useLocation();
+  const { state } = useLocation();
   const navigate = useNavigate();
-  const state = location.state;
 
-  const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
-  const [roundStartTime, setRoundStartTime] = useState(Date.now());
-  const [positions, setPositions] = useState([]);
-
-  // Redirige si no hay state
+  // Si no se recibe state o testId, redirige
   useEffect(() => {
-    if (!state) {
+    if (!state || !state.testId) {
       navigate('/');
     }
   }, [state, navigate]);
 
-  // Valores predeterminados
+  const testId = state?.testId;
+  const selectedVersion = state?.selectedVersion || "a";
+
+  const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
+  const [roundStartTime, setRoundStartTime] = useState(Date.now());
+  const [testStartTime, setTestStartTime] = useState(Date.now());
+  const [positions, setPositions] = useState([]);
+  const [results, setResults] = useState([]);
+  const [showPreview, setShowPreview] = useState(true);
+
   const rounds = state?.rounds || [];
   const totalRounds = rounds.length;
-  const currentRoundData = rounds[currentRoundIndex] || { images: [] };
-  const images = currentRoundData.images;
-  const startTime = state?.startTime || Date.now();
+  const currentRoundData = rounds[currentRoundIndex] || { images: [], targetFolder: '' };
+  const originalImages = currentRoundData.images;
+  const targetFolder = currentRoundData.targetFolder;
 
-  // Pre-cargar imágenes de la ronda actual
   useEffect(() => {
-    images.forEach(imgData => {
+    originalImages.forEach(imgData => {
       const img = new Image();
       img.src = imgData.url;
     });
-  }, [images]);
+  }, [originalImages]);
 
-  // Genera posiciones sin solapamiento con imágenes de 15% de ancho y alto
-  const generateNonOverlappingPositions = () => {
-    const positions = [];
+  const targetImage = useMemo(() => {
+    const targetLetter = emotionMapping[state.selectedEmotion];
+    const found = originalImages.find(img => {
+      if (img.folder !== targetFolder) return false;
+      if (!img.file) return false;
+      const parts = img.file.split('_');
+      return parts[3] === targetLetter;
+    });
+    return found || originalImages.find(img => img.folder === targetFolder);
+  }, [originalImages, targetFolder, selectedVersion, state.selectedEmotion]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowPreview(false);
+      setRoundStartTime(Date.now());
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [currentRoundIndex]);
+
+  // Inicia el eye tracking al cargar el test con logs adicionales
+  useEffect(() => {
+    if (window.webgazer) {
+      window.webgazer
+        .setRegression('ridge')
+        .setGazeListener((data, elapsedTime) => {
+          console.log('GazeListener invocado');
+          if (data) {
+            console.log('Eye tracking data:', data, 'elapsed:', elapsedTime);
+          } else {
+            console.log('No hay datos de eye tracking en este momento.');
+          }
+        })
+        .begin()
+        .then(() => console.log("WebGazer iniciado."));
+    }
+    return () => {
+      if (window.webgazer) {
+        try {
+          window.webgazer.pause();
+          window.webgazer.clearData();
+        } catch (e) {
+          console.error("Error al detener WebGazer:", e);
+        }
+      }
+    };
+  }, []);
+
+  const generateNonOverlappingPositions = (numImages) => {
+    const pos = [];
     const maxAttempts = 1000;
-    const imageWidthPercent = 10;  // Ajusta según el tamaño deseado
+    const imageWidthPercent = 10;
     const imageHeightPercent = 25;
     const containerWidth = 100;
     const containerHeight = 80;
-
-    for (let i = 0; i < images.length; i++) {
+    for (let i = 0; i < numImages; i++) {
       let attempt = 0;
       let position;
       let overlapping = true;
@@ -50,71 +108,140 @@ const TestPage = () => {
         const top = Math.random() * (containerHeight - imageHeightPercent);
         const left = Math.random() * (containerWidth - imageWidthPercent);
         position = { top, left, width: imageWidthPercent, height: imageHeightPercent };
-
-        overlapping = positions.some(pos => {
+        overlapping = pos.some(p => {
           return !(
-            (left + imageWidthPercent <= parseFloat(pos.left)) ||
-            (left >= parseFloat(pos.left) + parseFloat(pos.width)) ||
-            (top + imageHeightPercent <= parseFloat(pos.top)) ||
-            (top >= parseFloat(pos.top) + parseFloat(pos.height))
+            (left + imageWidthPercent <= parseFloat(p.left)) ||
+            (left >= parseFloat(p.left) + parseFloat(p.width)) ||
+            (top + imageHeightPercent <= parseFloat(p.top)) ||
+            (top >= parseFloat(p.top) + parseFloat(p.height))
           );
         });
         attempt++;
       }
-      positions.push({
+      pos.push({
         top: `${position.top}%`,
         left: `${position.left}%`,
         width: `${imageWidthPercent}%`,
         height: `${imageHeightPercent}%`
       });
     }
-    return positions;
+    return pos;
   };
 
-  useEffect(() => {
-    setPositions(generateNonOverlappingPositions());
-    setRoundStartTime(Date.now());
-  }, [currentRoundIndex, images]);
+  const displayImages = originalImages;
 
-  const handleImageClick = (img) => {
-    const clickTime = Date.now();
-    const reactionTime = clickTime - roundStartTime;
-    console.log(
-      `Imagen ${img.id} clickeada en la ronda ${currentRoundIndex + 1}. Tiempo de reacción: ${reactionTime} ms`
-    );
-    
-    if (currentRoundIndex < totalRounds - 1) {
-      setCurrentRoundIndex(currentRoundIndex + 1);
-    } else {
-      alert("Test finalizado");
-      // Aquí podrías redirigir o mostrar resultados
+  useEffect(() => {
+    if (!showPreview) {
+      setPositions(generateNonOverlappingPositions(displayImages.length));
+      setRoundStartTime(Date.now());
+    }
+  }, [currentRoundIndex, displayImages.length, showPreview]);
+
+  const generateCSVContent = () => {
+    const header = "round,reactionTime,result\n";
+    return results.reduce((acc, curr) => acc + `${curr.round},${curr.reactionTime},${curr.result}\n`, header);
+  };
+
+  const saveCSVToSupabase = async (csvContent) => {
+    if (!testId) return;
+    try {
+      const { error } = await supabase
+        .from('csv_logs')
+        .insert([{ test_id: testId, csv_content: csvContent }]);
+      if (error) console.error("Error al guardar CSV:", error);
+    } catch (err) {
+      console.error("Error en saveCSVToSupabase:", err);
     }
   };
 
-  if (!state) return null;
+  const saveTestResults = async (duration, correctCount, errorCount) => {
+    try {
+      const { error } = await supabase
+        .from('test_results')
+        .insert([{ test_id: testId, duration, correct_count: correctCount, error_count: errorCount }]);
+      if (error) console.error("Error al guardar resultados:", error);
+    } catch (err) {
+      console.error("Error en saveTestResults:", err);
+    }
+  };
+
+  const finalizeTest = async (finalResults) => {
+    const csvContent = finalResults.reduce(
+      (acc, curr) => acc + `${curr.round},${curr.reactionTime},${curr.result}\n`, 
+      "round,reactionTime,result\n"
+    );
+    await saveCSVToSupabase(csvContent);
+    const duration = Date.now() - testStartTime;
+    const correctCount = finalResults.filter(r => r.result === "acertado").length;
+    const errorCount = finalResults.filter(r => r.result === "fallado").length;
+    await saveTestResults(duration, correctCount, errorCount);
+    const { error } = await supabase
+      .from('test')
+      .update({ status: 'finalizado' })
+      .match({ id: testId });
+    if (error) {
+      console.error("Error al actualizar test:", error);
+    }
+    navigate('/userresults');
+  };
+
+  const handleImageClick = (img) => {
+    if (showPreview) return;
+    const clickTime = Date.now();
+    const reactionTime = clickTime - roundStartTime;
+    const isCorrect = img.id === targetImage.id;
+    const resultStr = isCorrect ? "acertado" : "fallado";
+
+    console.log("imagen target:", targetImage, "imagen elegida:", img, resultStr);
+
+    const newResult = { round: currentRoundIndex + 1, reactionTime, result: resultStr };
+    const updatedResults = [...results, newResult];
+
+    if (currentRoundIndex < totalRounds - 1) {
+      setResults(updatedResults);
+      setCurrentRoundIndex(currentRoundIndex + 1);
+      setShowPreview(true);
+    } else {
+      setResults(updatedResults);
+      alert("Test finalizado");
+      finalizeTest(updatedResults);
+    }
+  };
 
   return (
     <div className="testpage-container">
-      <h2>Ronda {currentRoundIndex + 1} / {totalRounds}</h2>
-      <div 
-        className="images-container" 
-        style={{ position: 'relative', height: '80vh', width: '100%', border: '1px solid #ccc' }}
-      >
-        {images.map((img, index) => (
-          <img
-            key={img.id}
-            src={img.url}
-            alt={`Imagen ${img.id}`}
-            onClick={() => handleImageClick(img)}
-            style={{
-              position: 'absolute',
-              cursor: 'pointer',
-              objectFit: 'cover', // Para mantener la proporción sin distorsión
-              ...positions[index]
-            }}
-          />
-        ))}
+      <div className="testpage-header">
+        <h2>Ronda {currentRoundIndex + 1} / {totalRounds}</h2>
+        <div className="target-info">Busca: {targetFolder}</div>
+        <button className="cancel-btn" onClick={() => navigate('/userresults')}>Cancelar Test</button>
       </div>
+      {showPreview && targetImage ? (
+        <div className="preview-container">
+          <img className="preview-image" src={targetImage.url} alt={`Target ${targetImage.id}`} />
+          <p className="preview-text">Observa la imagen target</p>
+        </div>
+      ) : (
+        <div className="images-container">
+          {displayImages.map((img, index) => (
+            <div
+              key={img.id}
+              style={{
+                position: 'absolute',
+                cursor: 'pointer',
+                ...positions[index]
+              }}
+              onClick={() => handleImageClick(img)}
+            >
+              <img
+                src={img.url}
+                alt={`Imagen ${img.id}`}
+                style={{ width: '100%', height: '80%', objectFit: 'cover' }}
+              />
+              <p style={{ margin: '0', fontSize: '0.7rem', textAlign: 'center' }}>{img.file}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

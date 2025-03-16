@@ -8,17 +8,54 @@ const UserPanel = () => {
   const navigate = useNavigate();
   const [showTestsModal, setShowTestsModal] = useState(false);
   const [tests, setTests] = useState([]);
+  const [userId, setUserId] = useState(null);
 
-  // Función para obtener los tests pendientes del usuario
+  // Obtener el user_id del usuario actual al cargar el componente
+  useEffect(() => {
+    const fetchUserId = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) {
+        console.error("Error al obtener el usuario:", error);
+      } else if (user) {
+        console.log("Usuario autenticado:", user); 
+        console.log("Email del usuario:", user.email); 
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', user.email)
+          .single();
+
+        if (userError) {
+          console.error("Error al obtener el ID del usuario:", userError);
+        } else {
+          console.log("ID del usuario encontrado:", userData?.id); 
+          setUserId(userData?.id);
+        }
+      } else {
+        console.log("No hay usuario autenticado.");
+      }
+    };
+    fetchUserId();
+  }, []);
+
+  // Función para obtener los tests pendientes del usuario actual
   const fetchTests = async () => {
+    if (!userId) {
+      console.log("userId es null, no se puede obtener los tests.");
+      return;
+    }
+
     const { data, error } = await supabase
-      .from('test') // Asegúrate de usar el nombre correcto de la tabla
+      .from('test')
       .select('*')
-      .eq('status', 'pendiente'); // Filtra por tests pendientes
+      .eq('status', 'pendiente')
+      .eq('user_id', userId);
 
     if (error) {
       console.error("Error al obtener tests:", error);
     } else {
+      console.log("Tests obtenidos:", data); 
       setTests(data);
     }
   };
@@ -27,15 +64,15 @@ const UserPanel = () => {
     alert("Aquí se mostrarán los resultados.");
   };
 
-  // Al hacer clic en "Realizar Test" se obtiene la lista de tests y se muestra el modal
   const handlePerformTest = () => {
+    console.log("Obteniendo tests para el usuario con ID:", userId); 
     fetchTests();
     setShowTestsModal(true);
   };
 
-  // Al seleccionar un test se navega a TestPage.js con la configuración del test
+  // Agregamos testId al objeto state enviado a TestPage
   const handleTestClick = (test) => {
-    navigate('/testpage', { state: test.configuration });
+    navigate('/testpage', { state: { ...test.configuration, testId: test.id } });
   };
 
   const handleCloseModal = () => {
