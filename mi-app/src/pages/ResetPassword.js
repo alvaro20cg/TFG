@@ -5,13 +5,13 @@ import supabase from '../config/supabase';
 import './ResetPassword.css';
 
 const ResetPassword = () => {
+  const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Extrae el token de la URL y lo establece en Supabase
     const urlParams = new URLSearchParams(window.location.search);
     const accessToken = urlParams.get('access_token');
     if (accessToken) {
@@ -19,7 +19,6 @@ const ResetPassword = () => {
     }
   }, []);
 
-  // Función para actualizar el campo "password" en la tabla "users"
   const updateCustomUserPassword = async (email, newPassword) => {
     const { data, error } = await supabase
       .from('users')
@@ -34,16 +33,12 @@ const ResetPassword = () => {
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
-    // Actualiza la contraseña en Supabase Auth
     const { data: updatedUserData, error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
       setErrorMsg('Error al actualizar la contraseña: ' + error.message);
     } else {
-      // Se obtiene el email del usuario actualizado
-      const user = updatedUserData.user;
-      if (user && user.email) {
-        // Actualiza la contraseña en la tabla personalizada "users"
-        await updateCustomUserPassword(user.email, newPassword);
+      if (email) {
+        await updateCustomUserPassword(email, newPassword);
       }
       setResetSuccess(true);
     }
@@ -53,11 +48,23 @@ const ResetPassword = () => {
     navigate('/');
   };
 
+  const handleCancel = () => {
+    setResetSuccess(false);
+  };
+
   return (
     <div className="reset-container">
       <div className="reset-box">
         <h2>Restablecer Contraseña</h2>
         <form onSubmit={handleResetPassword}>
+          <input
+            type="text"
+            placeholder="Correo o Usuario"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="input-large"
+          />
           <input
             type="password"
             placeholder="Nueva contraseña"
@@ -65,7 +72,7 @@ const ResetPassword = () => {
             onChange={(e) => setNewPassword(e.target.value)}
             required
           />
-          <button type="submit">Actualizar contraseña</button>
+          <button type="submit" className="btn">Actualizar contraseña</button>
         </form>
         {errorMsg && <p className="error">{errorMsg}</p>}
       </div>
@@ -74,7 +81,10 @@ const ResetPassword = () => {
         <div className="modal-overlay">
           <div className="modal-content">
             <h3>Contraseña actualizada correctamente.</h3>
-            <button onClick={handleAccept}>Aceptar</button>
+            <div className="modal-buttons">
+              <button onClick={handleAccept} className="btn">Aceptar</button>
+              <button onClick={handleCancel} className="btn cancel-btn">Cancelar</button>
+            </div>
           </div>
         </div>
       )}

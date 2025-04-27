@@ -1,23 +1,39 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ========================
+# Node
+# ========================
+/node_modules/
+/.pnp/
+/.pnp.js
+/coverage/
+/build/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# testing
-/coverage
-
-# production
-/build
-
-# misc
-.DS_Store
+# Env files
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# macOS
+.DS_Store
+
+# ========================
+# Python
+# ========================
+# Entorno virtual
+/server/venv/
+
+# Bytecode
+**/__pycache__/
+/*.py[cod]
+*$py.class
+
+# Editor dirs
+/.vscode/
+/.idea/
+/*.sublime-project
+/*.sublime-workspace

@@ -183,14 +183,8 @@ const MainPage = () => {
               />
               <div style={{ marginTop: '10px' }}>
                 <button type="submit" className="login-btn">Enviar</button>
-                <button
-                  type="button"
-                  onClick={() => setShowForgotModal(false)}
-                  className="login-btn"
-                  style={{ marginLeft: '10px', background: 'gray' }}
-                >
-                  Cancelar
-                </button>
+                <button type="button"   onClick={() => setShowForgotModal(false)}
+                  className="login-btn-cancelar">Cancelar</button>
               </div>
             </form>
           </div>

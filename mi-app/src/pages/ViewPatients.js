@@ -225,7 +225,7 @@ const ViewPatients = () => {
                     ) : (
                       <>
                         <button onClick={() => handleEdit(patient)}>Editar</button>
-                        <button onClick={() => handleViewResults(patient)}>Ver Resultados</button>
+                        <button onClick={() => handleViewResults(patient)}>Ver Resultados</button> 
                       </>
                     )}
                   </td>

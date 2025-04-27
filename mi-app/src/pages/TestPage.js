@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
 import './TestPage.css';
+import heatmap from 'heatmap.js'; // Importa la librería heatmap.js
 
 const emotionMapping = {
   "Alegría": "h",
@@ -12,49 +13,10 @@ const emotionMapping = {
   "Neutral": "n"
 };
 
-// Componente para mostrar la cámara y verificar la captura de la cara
-const EyeTrackingPreview = () => {
-  const videoRef = useRef(null);
-
-  useEffect(() => {
-    async function getCameraStream() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (error) {
-        console.error("Error al acceder a la cámara:", error);
-      }
-    }
-    getCameraStream();
-    return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const tracks = videoRef.current.srcObject.getTracks();
-        tracks.forEach(track => track.stop());
-      }
-    };
-  }, []);
-
-  return (
-    <div style={{ textAlign: 'center', padding: '20px' }}>
-      <h2>Prueba de Cámara</h2>
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        style={{ width: '80%', maxWidth: '600px', borderRadius: '10px' }}
-      />
-      <p>Asegúrate de haber concedido permisos para acceder a la cámara.</p>
-    </div>
-  );
-};
-
 const TestPage = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
 
-  // Si no se recibe state o testId, redirige
   useEffect(() => {
     if (!state || !state.testId) {
       navigate('/');
@@ -70,6 +32,7 @@ const TestPage = () => {
   const [positions, setPositions] = useState([]);
   const [results, setResults] = useState([]);
   const [showPreview, setShowPreview] = useState(true);
+  const [eyeTrackingData, setEyeTrackingData] = useState([]);
 
   const rounds = state?.rounds || [];
   const totalRounds = rounds.length;
@@ -94,77 +57,6 @@ const TestPage = () => {
     });
     return found || originalImages.find(img => img.folder === targetFolder);
   }, [originalImages, targetFolder, selectedVersion, state.selectedEmotion]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowPreview(false);
-      setRoundStartTime(Date.now());
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [currentRoundIndex]);
-
-  // Referencia para el contenedor del heatmap y datos
-  const heatmapContainerRef = useRef(null);
-  const [heatmapData, setHeatmapData] = useState([]);
-  const heatmapInstanceRef = useRef(null);
-
-  useEffect(() => {
-    if (heatmapContainerRef.current && window.h337) {
-      // Inicializa heatmap.js
-      heatmapInstanceRef.current = window.h337.create({
-        container: heatmapContainerRef.current,
-        radius: 50,
-        maxOpacity: 0.6,
-        minOpacity: 0,
-        blur: 0.90
-      });
-    }
-  }, []);
-
-  // Inicia WebGazer y actualiza el heatmap
-  useEffect(() => {
-    if (window.webgazer) {
-      window.webgazer
-        .setRegression('ridge')
-        .setGazeListener((data, elapsedTime) => {
-          console.log('GazeListener invocado');
-          if (data) {
-            console.log('Eye tracking data:', data, 'elapsed:', elapsedTime);
-            setHeatmapData(prev => [
-              ...prev,
-              { x: data.x, y: data.y, value: 1 }
-            ]);
-          } else {
-            console.log('No hay datos de eye tracking en este momento.');
-          }
-        })
-        .begin()
-        .then(() => {
-          console.log("WebGazer iniciado.");
-          window.webgazer.showPredictionPoints(true);
-        });
-    }
-    return () => {
-      if (window.webgazer) {
-        try {
-          window.webgazer.pause();
-          window.webgazer.clearData();
-        } catch (e) {
-          console.error("Error al detener WebGazer:", e);
-        }
-      }
-    };
-  }, []);
-
-  // Actualiza el heatmap cada vez que cambian los datos
-  useEffect(() => {
-    if (heatmapInstanceRef.current && heatmapData.length > 0) {
-      heatmapInstanceRef.current.setData({
-        max: 10,
-        data: heatmapData
-      });
-    }
-  }, [heatmapData]);
 
   const generateNonOverlappingPositions = (numImages) => {
     const pos = [];
@@ -210,11 +102,39 @@ const TestPage = () => {
     }
   }, [currentRoundIndex, displayImages.length, showPreview]);
 
+  const generateHeatmap = () => {
+    const heatmapInstance = heatmap.create({
+      container: document.querySelector('.heatmap-container'),
+      radius: 50,  // Tamaño de los puntos del mapa de calor
+      maxOpacity: 0.6,
+      minOpacity: 0.1,
+      blur: 0.9
+    });
+
+    // Procesa los datos de seguimiento ocular para adaptarlos al mapa de calor
+    const points = eyeTrackingData.map(data => ({
+      x: data.x,
+      y: data.y,
+      value: 1
+    }));
+
+    // Cargar los puntos en el mapa de calor
+    heatmapInstance.setData({ max: 1, data: points });
+  };
+
+  useEffect(() => {
+    if (eyeTrackingData.length > 0) {
+      generateHeatmap();
+    }
+  }, [eyeTrackingData]);
+
+  // Función para generar y guardar el CSV con los resultados del test
   const generateCSVContent = () => {
     const header = "round,reactionTime,result\n";
     return results.reduce((acc, curr) => acc + `${curr.round},${curr.reactionTime},${curr.result}\n`, header);
   };
 
+  // Función para guardar el CSV en Supabase
   const saveCSVToSupabase = async (csvContent) => {
     if (!testId) return;
     try {
@@ -227,6 +147,7 @@ const TestPage = () => {
     }
   };
 
+  // Función para guardar los resultados del test en Supabase
   const saveTestResults = async (duration, correctCount, errorCount) => {
     try {
       const { error } = await supabase
@@ -277,25 +198,7 @@ const TestPage = () => {
     } else {
       setResults(updatedResults);
       alert("Test finalizado");
-      finalizeTest(updatedResults);
-    }
-  };
-
-  // Función para descargar el heatmap como imagen
-  const downloadHeatmap = () => {
-    if (heatmapContainerRef.current) {
-      const canvas = heatmapContainerRef.current.querySelector("canvas");
-      if (canvas) {
-        const dataURL = canvas.toDataURL("image/png");
-        const link = document.createElement("a");
-        link.href = dataURL;
-        link.download = "heatmap.png";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        console.error("No se encontró el canvas en el heatmap container.");
-      }
+      finalizeTest(updatedResults);  // Aquí llamamos a finalizeTest
     }
   };
 
@@ -306,35 +209,14 @@ const TestPage = () => {
         <div className="target-info">Busca: {targetFolder}</div>
         <button className="cancel-btn" onClick={() => navigate('/userresults')}>Cancelar Test</button>
       </div>
-      {/* Botón para descargar el mapa de calor */}
-      <button 
-        onClick={downloadHeatmap} 
-        style={{ position: 'fixed', top: 10, right: 10, zIndex: 10000 }}
-      >
-        Descargar Mapa de Calor
-      </button>
-      {/* Contenedor para el heatmap */}
-      <div 
-        ref={heatmapContainerRef}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none',
-          zIndex: 9999
-        }}
-      ></div>
-      {/* Muestra la prueba de cámara para verificar el eye tracking */}
-      <EyeTrackingPreview />
       {showPreview && targetImage ? (
         <div className="preview-container">
           <img className="preview-image" src={targetImage.url} alt={`Target ${targetImage.id}`} />
           <p className="preview-text">Observa la imagen target</p>
         </div>
       ) : (
-        <div className="images-container">
+        <div className="images-container" style={{ position: 'relative' }}>
+          <div className="heatmap-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}></div>
           {displayImages.map((img, index) => (
             <div
               key={img.id}

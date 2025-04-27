@@ -48,7 +48,7 @@
 
 /* Tabla */
 .patients-table {
-  width: 90%;
+  width: 45%;
   border-collapse: collapse;
   margin-top: 30px;
   background-color: rgba(255, 255, 255, 0.85);
@@ -128,7 +128,7 @@ button:hover {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
+  width: 100%;           /* ya ocupa todo el ancho */
   height: 100%;
   background: rgba(0,0,0,0.5);
   display: flex;
@@ -136,15 +136,15 @@ button:hover {
   align-items: center;
   z-index: 1000;
 }
-
-.modal-content {
-  background-color: #fff;
+.results-modal .modal-content {
+  background: rgba(255, 255, 255, 0.9);
   padding: 20px;
   border-radius: 10px;
   max-width: 80%;
   max-height: 80%;
   overflow-y: auto;
 }
+
 
 .results-table {
   width: 100%;
@@ -167,8 +167,13 @@ button:hover {
   border: none;
   cursor: pointer;
   transition: 0.3s ease;
+  width: 25%;
 }
 
 .close-modal-btn:hover {
   background-color: #fad0c4;
+}
+
+.button .patients-table{
+  margin-left: 100px;
 }

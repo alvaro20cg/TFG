@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
 import './TestPage.css';
@@ -10,6 +10,44 @@ const emotionMapping = {
   "Asco": "d",
   "Enojo": "a",
   "Neutral": "n"
+};
+
+// Componente para mostrar la cámara y verificar la captura de la cara
+const EyeTrackingPreview = () => {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    async function getCameraStream() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error("Error al acceder a la cámara:", error);
+      }
+    }
+    getCameraStream();
+    return () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+        const tracks = videoRef.current.srcObject.getTracks();
+        tracks.forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  return (
+    <div style={{ textAlign: 'center', padding: '20px' }}>
+      <h2>Prueba de Cámara</h2>
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        style={{ width: '80%', maxWidth: '600px', borderRadius: '10px' }}
+      />
+      <p>Asegúrate de haber concedido permisos para acceder a la cámara.</p>
+    </div>
+  );
 };
 
 const TestPage = () => {
@@ -65,7 +103,25 @@ const TestPage = () => {
     return () => clearTimeout(timer);
   }, [currentRoundIndex]);
 
-  // Inicia el eye tracking al cargar el test con logs adicionales
+  // Referencia para el contenedor del heatmap y datos
+  const heatmapContainerRef = useRef(null);
+  const [heatmapData, setHeatmapData] = useState([]);
+  const heatmapInstanceRef = useRef(null);
+
+  useEffect(() => {
+    if (heatmapContainerRef.current && window.h337) {
+      // Inicializa heatmap.js
+      heatmapInstanceRef.current = window.h337.create({
+        container: heatmapContainerRef.current,
+        radius: 50,
+        maxOpacity: 0.6,
+        minOpacity: 0,
+        blur: 0.90
+      });
+    }
+  }, []);
+
+  // Inicia WebGazer y actualiza el heatmap
   useEffect(() => {
     if (window.webgazer) {
       window.webgazer
@@ -74,12 +130,19 @@ const TestPage = () => {
           console.log('GazeListener invocado');
           if (data) {
             console.log('Eye tracking data:', data, 'elapsed:', elapsedTime);
+            setHeatmapData(prev => [
+              ...prev,
+              { x: data.x, y: data.y, value: 1 }
+            ]);
           } else {
             console.log('No hay datos de eye tracking en este momento.');
           }
         })
         .begin()
-        .then(() => console.log("WebGazer iniciado."));
+        .then(() => {
+          console.log("WebGazer iniciado.");
+          window.webgazer.showPredictionPoints(true);
+        });
     }
     return () => {
       if (window.webgazer) {
@@ -92,6 +155,16 @@ const TestPage = () => {
       }
     };
   }, []);
+
+  // Actualiza el heatmap cada vez que cambian los datos
+  useEffect(() => {
+    if (heatmapInstanceRef.current && heatmapData.length > 0) {
+      heatmapInstanceRef.current.setData({
+        max: 10,
+        data: heatmapData
+      });
+    }
+  }, [heatmapData]);
 
   const generateNonOverlappingPositions = (numImages) => {
     const pos = [];
@@ -208,6 +281,24 @@ const TestPage = () => {
     }
   };
 
+  // Función para descargar el heatmap como imagen
+  const downloadHeatmap = () => {
+    if (heatmapContainerRef.current) {
+      const canvas = heatmapContainerRef.current.querySelector("canvas");
+      if (canvas) {
+        const dataURL = canvas.toDataURL("image/png");
+        const link = document.createElement("a");
+        link.href = dataURL;
+        link.download = "heatmap.png";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        console.error("No se encontró el canvas en el heatmap container.");
+      }
+    }
+  };
+
   return (
     <div className="testpage-container">
       <div className="testpage-header">
@@ -215,6 +306,28 @@ const TestPage = () => {
         <div className="target-info">Busca: {targetFolder}</div>
         <button className="cancel-btn" onClick={() => navigate('/userresults')}>Cancelar Test</button>
       </div>
+      {/* Botón para descargar el mapa de calor */}
+      <button 
+        onClick={downloadHeatmap} 
+        style={{ position: 'fixed', top: 10, right: 10, zIndex: 10000 }}
+      >
+        Descargar Mapa de Calor
+      </button>
+      {/* Contenedor para el heatmap */}
+      <div 
+        ref={heatmapContainerRef}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          zIndex: 9999
+        }}
+      ></div>
+      {/* Muestra la prueba de cámara para verificar el eye tracking */}
+      <EyeTrackingPreview />
       {showPreview && targetImage ? (
         <div className="preview-container">
           <img className="preview-image" src={targetImage.url} alt={`Target ${targetImage.id}`} />
