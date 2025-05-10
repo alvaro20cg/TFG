@@ -1,3 +1,4 @@
+// ConfigurarTest.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
@@ -7,7 +8,6 @@ import imagenesData from '../json/imagenes.json';
 const emotions = ["Alegría", "Tristeza", "Enfado", "Asco", "Enojo", "Neutral"];
 const people = ['004', '066', '079', '116', '140', '168'];
 
-// Mapping actualizado: las claves se corresponden con el array de emociones.
 const emotionMapping = {
   "Alegría": "h",
   "Tristeza": "s",
@@ -20,6 +20,7 @@ const emotionMapping = {
 const ConfigurarTest = () => {
   const navigate = useNavigate();
 
+  // Estados de configuración
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState("");
   const [error, setError] = useState(null);
@@ -30,6 +31,11 @@ const ConfigurarTest = () => {
   const [selectedVersion, setSelectedVersion] = useState("");
   const [selectedDifficulty, setSelectedDifficulty] = useState("");
 
+  // Estados del modal de nombre
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [testName, setTestName] = useState("");
+
+  // Carga de pacientes
   useEffect(() => {
     const fetchPatients = async () => {
       const { data, error } = await supabase
@@ -46,6 +52,7 @@ const ConfigurarTest = () => {
     fetchPatients();
   }, []);
 
+  // Handlers de selección
   const handlePersonSelection = (person) => {
     setSelectedPeople(prev =>
       prev.includes(person)
@@ -53,15 +60,14 @@ const ConfigurarTest = () => {
         : [...prev, person]
     );
   };
-
   const handleEmotionSelection = (emotion) => {
     setSelectedEmotion(emotion);
   };
-
   const handleRoundsChange = (e) => {
     setNumRounds(e.target.value);
   };
 
+  // Helpers de imágenes
   const getFolderImage = (person) => {
     const defaultVersion = "a";
     const happyImage = imagenesData.find(
@@ -72,9 +78,6 @@ const ConfigurarTest = () => {
     );
     return happyImage ? `/images/${happyImage.folder}/${happyImage.file}` : null;
   };
-
-  // Modo fácil: filtra las imágenes de la carpeta y para la emoción objetivo
-  // incluye solo la imagen que corresponda a la versión elegida.
   const getEasyModeImages = (folder) => {
     const targetLetter = emotionMapping[selectedEmotion];
     const folderImages = imagenesData
@@ -85,21 +88,22 @@ const ConfigurarTest = () => {
          url: `/images/${img.folder}/${img.file}`,
          folder: img.folder
       }));
-    const filteredImages = folderImages.filter(img => {
-       const parts = img.file.split('_'); // [folder, "o", "m", <emoción>, <opción>.jpg]
-       if (parts.length < 5) return true;
-       const emotion = parts[3]; 
-       const option = parts[4].split('.')[0]; 
-       if (emotion === targetLetter) {
-         // Para la imagen objetivo, se incluye solo si coincide la opción elegida.
-         return option === selectedVersion;
-       }
-       return true;
-    });
-    return filteredImages.sort(() => Math.random() - 0.5);
+    return folderImages
+      .filter(img => {
+        const parts = img.file.split('_');
+        if (parts.length < 5) return true;
+        const emotion = parts[3];
+        const option = parts[4].split('.')[0];
+        if (emotion === targetLetter) {
+          return option === selectedVersion;
+        }
+        return true;
+      })
+      .sort(() => Math.random() - 0.5);
   };
 
-  const iniciarTest = async () => {
+  // Al hacer click en "Realizar Test": validamos y abrimos modal
+  const iniciarTest = () => {
     if (!selectedPatient) {
       alert('Debes seleccionar un usuario.');
       return;
@@ -120,57 +124,86 @@ const ConfigurarTest = () => {
       alert('Debes seleccionar una dificultad.');
       return;
     }
+    setShowNameModal(true);
+  };
+
+  // Cancelar modal
+  const handleCancel = () => {
+    setShowNameModal(false);
+    setTestName("");
+  };
+
+  // Confirmar nombre y guardar en Supabase
+  const handleConfirmName = async () => {
+    if (!testName.trim()) {
+      alert("El nombre no puede estar vacío.");
+      return;
+    }
 
     const roundsNumber = parseInt(numRounds, 10);
     let rounds = [];
     for (let i = 0; i < roundsNumber; i++) {
       selectedPeople.forEach(folder => {
-        let roundImages = [];
-        if (selectedDifficulty === "facil") {
-          roundImages = getEasyModeImages(folder);
-        } else {
-          // Modo difícil: se muestran TODAS las imágenes de la carpeta, sin filtrar.
-          const allImages = imagenesData
-            .filter(img => img.folder === folder)
-            .map(img => ({
-              id: img.id,
-              url: `/images/${img.folder}/${img.file}`,
-              folder: img.folder,
-              file: img.file
-            }));
-          roundImages = allImages.sort(() => Math.random() - 0.5);
-        }
-        roundImages.sort(() => Math.random() - 0.5);
+        let images = selectedDifficulty === "facil"
+          ? getEasyModeImages(folder)
+          : imagenesData
+              .filter(img => img.folder === folder)
+              .map(img => ({
+                id: img.id,
+                url: `/images/${img.folder}/${img.file}`,
+                folder: img.folder,
+                file: img.file
+              }))
+              .sort(() => Math.random() - 0.5);
+
         rounds.push({
           targetFolder: folder,
-          images: roundImages
+          images: images.sort(() => Math.random() - 0.5)
         });
       });
     }
     const startTime = Date.now();
 
-    const { data: insertedTest, error } = await supabase
+    const { data: insertedTest, error: insertError } = await supabase
       .from('test')
-      .insert([
-        {
-          user_id: selectedPatient,
-          configuration: { rounds, selectedEmotion, selectedDifficulty, startTime },
-          status: 'pendiente'
-        }
-      ])
+      .insert([{
+        user_id: selectedPatient,
+        nombre: testName,
+        configuration: { rounds, selectedEmotion, selectedDifficulty, startTime },
+        status: 'pendiente'
+      }])
       .select();
 
-    if (error) {
-      console.error("Error al guardar la configuración del test", error);
-      alert("Error al guardar la configuración del test");
+    if (insertError) {
+      console.error("Error al guardar el test:", insertError);
+      alert("Error al guardar el test");
       return;
     }
-    alert("La configuración del test se ha guardado. Desde tu panel podrás iniciar el test.");
-    // Permanecemos en la misma página.
+
+    alert("Test registrado correctamente.");
+    setShowNameModal(false);
+    // opcional: resetear o navegar
   };
 
   return (
     <div className="realizar-test-container">
+      {showNameModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>Nombre del Test</h3>
+            <input
+              type="text"
+              placeholder="Escribe un nombre para el test"
+              value={testName}
+              onChange={e => setTestName(e.target.value)}
+            />
+            <div className="modal-buttons">
+              <button onClick={handleCancel} className="back-btn">Cancelar</button>
+              <button onClick={handleConfirmName} className="start-button">Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
       <h2>Test Psicológico: Identifica la emoción</h2>
       <div className="selection-wrapper">
         <div className="selection-container">
@@ -241,7 +274,7 @@ const ConfigurarTest = () => {
             <select
               id="version-select"
               value={selectedVersion}
-              onChange={(e) => setSelectedVersion(e.target.value)}
+              onChange={e => setSelectedVersion(e.target.value)}
             >
               <option value="">Selecciona la versión</option>
               <option value="a">A</option>
@@ -253,7 +286,7 @@ const ConfigurarTest = () => {
             <select
               id="difficulty-select"
               value={selectedDifficulty}
-              onChange={(e) => setSelectedDifficulty(e.target.value)}
+              onChange={e => setSelectedDifficulty(e.target.value)}
             >
               <option value="">Selecciona la dificultad</option>
               <option value="facil">Fácil</option>
@@ -265,7 +298,7 @@ const ConfigurarTest = () => {
             <select
               id="patient-select"
               value={selectedPatient}
-              onChange={(e) => setSelectedPatient(e.target.value)}
+              onChange={e => setSelectedPatient(e.target.value)}
             >
               <option value="">-- Selecciona un usuario --</option>
               {patients.map(patient => (

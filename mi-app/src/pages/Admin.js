@@ -1,3 +1,4 @@
+// src/pages/Admin.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
@@ -11,11 +12,16 @@ const Admin = () => {
   };
 
   const goToConfigurarTest = () => {
-    navigate('/configurar-test'); // Actualiza la ruta a 'configurar-test'
+    navigate('/configurar-test');
   };
 
   const goToViewPatients = () => {
     navigate('/view-patients');
+  };
+
+  // Nuevo handler para resultados
+  const goToViewResults = () => {
+    navigate('/view-results');
   };
 
   return (
@@ -29,10 +35,13 @@ const Admin = () => {
             Registrar Paciente
           </button>
           <button className="admin-btn" onClick={goToConfigurarTest}>
-            Configurar Test {/* Cambiado de "Realizar Test" a "Configurar Test" */}
+            Configurar Test
           </button>
           <button className="admin-btn" onClick={goToViewPatients}>
             Ver Pacientes
+          </button>
+          <button className="admin-btn" onClick={goToViewResults}>
+            Ver Resultados
           </button>
         </div>
       </div>
