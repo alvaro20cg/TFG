@@ -1,13 +1,17 @@
 /* ConfigurarTest.css */
 /* Fondo y diseño general de la página */
 .realizar-test-container {
-  background: url('../assets/images/fondo.png') no-repeat center center/cover;
-  height: 100vh;
+  position: fixed;    /* o absolute, según necesites */
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: url('../assets/images/fondo.png') no-repeat center center;
+  background-size: cover;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  position: relative;
   z-index: 1;
 }
 
@@ -41,15 +45,21 @@
 
 /* Contenedor unificado para todas las selecciones */
 .selection-wrapper {
+  /* Ancho fluido entre 320px y 600px, ocupando hasta 90% del padre */
+  /*width: clamp(320px, 90%, 800px);
+  /* Altura máxima restando espacio para header/footer */
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+
+  padding: clamp(12px, 2%, 20px);
+  gap: clamp(12px, 2%, 20px);
+
   background: rgba(255, 255, 255, 0.8);
   border-radius: 12px;
-  padding: 20px;
-  margin-top: 30px;
-  max-width: 900px;
-  width: 100%;
+  margin: 30px auto;    /* centrado horizontal */
+
   display: flex;
   flex-direction: column;
-  gap: 20px;
 }
 
 /* Contenedor para "Selecciona las personas" y "Selecciona la emoción" */
@@ -257,7 +267,7 @@
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-  margin-top: 20px;
+  
 }
 
 .realizar-test-container button:hover {
@@ -374,4 +384,5 @@ input[type="checkbox"]:focus {
 .modal-buttons .start-button {
   flex: 1;
   margin: 0 5px;
+
 }

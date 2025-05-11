@@ -169,10 +169,12 @@ const ConfigurarTest = () => {
       .insert([{
         user_id: selectedPatient,
         nombre: testName,
+        test_type: 'caras',          // ← Aquí
         configuration: { rounds, selectedEmotion, selectedDifficulty, startTime },
         status: 'pendiente'
       }])
-      .select();
+    .select();
+
 
     if (insertError) {
       console.error("Error al guardar el test:", insertError);

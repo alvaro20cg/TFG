@@ -19,7 +19,7 @@ const Header = () => {
   return (
     <header className="header">
       <button className="logout-btn" onClick={handleLogout}>
-        Log Out
+        Cerrar sesión
       </button>
     </header>
   );

@@ -1,14 +1,20 @@
+/* Contenedor principal de vista de pacientes */
 .view-patients-container {
-  background: url('../assets/images/fondo.png') no-repeat center center/cover;
-  height: 100vh;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: url('../assets/images/fondo.png') no-repeat center center;
+  background-size: cover;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   align-items: center;
-  position: relative;
   z-index: 1;
 }
 
-/* Overlay */
+/* Overlay semitransparente */
 .view-patients-container::before {
   content: "";
   position: absolute;
@@ -20,159 +26,182 @@
   z-index: -1;
 }
 
-/* Título */
+/* Asegura que el contenido quede encima del overlay */
+.view-patients-container > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Título principal */
 .view-patients-container h1 {
   color: #fff;
+  font-family: 'Georgia', serif;
   font-size: 2.5em;
-  margin-bottom: 20px;
-  text-shadow: 1px 1px 5px rgba(0,0,0,0.5);
+  margin: 20px 0;
+  text-align: center;
+  text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.5);
 }
 
-/* Botón Atrás */
+/* Botón "Atrás" */
 .back-btn {
   background-color: #ff9a9e;
-  color: white;
-  font-size: 16px;
+  color: #fff;
+  font-size: 1em;
   padding: 10px 20px;
+  border: none;
   border-radius: 30px;
   cursor: pointer;
-  transition: 0.3s ease;
-  border: none;
+  transition: background-color 0.3s ease, transform 0.3s ease;
+  margin-bottom: 20px;
+  z-index: 2;
 }
-
 .back-btn:hover {
   background-color: #fad0c4;
   transform: scale(1.05);
 }
 
-/* Tabla */
+/* Tabla de pacientes */
 .patients-table {
-  width: 45%;
+  margin: 20px auto;     /* centrado horizontal y margen superior uniforme */
+  width: auto;
+  max-width: 1000px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
   border-collapse: collapse;
-  margin-top: 30px;
-  background-color: rgba(255, 255, 255, 0.85);
-  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  overflow-x: auto;
+  position: relative;
+  height: 350px;
+  display: block;
+  margin-top: 200px;
 }
-
-.patients-table th, .patients-table td {
-  padding: 12px 15px;
+.patients-table th,
+.patients-table td {
+  padding: 10px;
   text-align: center;
   border: 1px solid #ddd;
 }
-
 .patients-table th {
   background-color: #fad0c4;
   color: #333;
+  position: sticky;
+  top: 0;
 }
-
 .patients-table tbody tr:nth-child(even) {
   background-color: #f9f9f9;
 }
-
 .patients-table tbody tr:hover {
   background-color: #f1f1f1;
 }
-
 .patients-table input {
-  background-color: #fff;
-  border: 1px solid #ddd;
-  padding: 5px;
-  border-radius: 5px;
   width: 100%;
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background-color: #fff;
 }
 
-/* Botón de editar, guardar, eliminar y ver resultados */
+/* Botones de acciones (Editar, Guardar, Eliminar, Ver) */
 button {
   background-color: #ff9a9e;
-  color: white;
+  color: #fff;
+  border: none;
   border-radius: 30px;
   padding: 8px 16px;
-  border: none;
   cursor: pointer;
-  transition: 0.3s ease;
+  transition: background-color 0.3s ease, transform 0.3s ease;
 }
-
 button:hover {
   background-color: #fad0c4;
   transform: scale(1.05);
 }
 
+/* Confirmación de eliminación */
 .confirm-delete {
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 20px;
-  border-radius: 5px;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  text-align: center;
-}
-
-.confirm-delete button {
-  background-color: #ff9a9e;
-  color: white;
-  padding: 10px 20px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 20px;
   border-radius: 5px;
-  cursor: pointer;
+  text-align: center;
+  z-index: 1001;
+}
+.confirm-delete button {
   margin: 5px;
 }
-
 .confirm-delete button:hover {
   background-color: #fad0c4;
 }
 
-/* Modal de resultados centrado */
+/* Modal de resultados */
 .results-modal {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;           /* ya ocupa todo el ancho */
+  width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  
 }
 .results-modal .modal-content {
   background: rgba(255, 255, 255, 0.9);
-  padding: 20px;
   border-radius: 10px;
-  max-width: 80%;
+  padding: 20px;
+  width: 80%;            /* ocupa el 80% del ancho de la pantalla */
+  max-width: 800px;      /* ancho máximo */
   max-height: 80%;
   overflow-y: auto;
+  margin: 0 auto;        /* centrado horizontal extra */
+  box-sizing: border-box;
 }
 
-
+/* Tabla de resultados dentro del modal */
 .results-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 20px;
+  margin-top: 10px;
 }
-
-.results-table th, .results-table td {
+.results-table th,
+.results-table td {
   padding: 10px;
   border: 1px solid #ddd;
   text-align: center;
 }
 
+/* Botón para cerrar modal */
 .close-modal-btn {
+  width: 25%;
   margin-top: 20px;
   background-color: #ff9a9e;
-  color: white;
+  color: #fff;
   padding: 10px 20px;
-  border-radius: 5px;
   border: none;
+  border-radius: 5px;
   cursor: pointer;
-  transition: 0.3s ease;
-  width: 25%;
+  transition: background-color 0.3s ease;
 }
-
 .close-modal-btn:hover {
   background-color: #fad0c4;
 }
 
-.button .patients-table{
-  margin-left: 100px;
+/* Media Queries para responsividad */
+@media (max-width: 768px) {
+  .patients-table {
+    height: 300px;
+    font-size: 0.85em;
+  }
+  .view-patients-container h1 {
+    font-size: 2em;
+  }
+  .results-modal .modal-content {
+    width: 90%;
+    padding: 15px;
+  }
 }

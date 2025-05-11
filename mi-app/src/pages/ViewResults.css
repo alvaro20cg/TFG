@@ -1,12 +1,15 @@
-/* Contenedor completo con fondo */
 .results-container {
-  background: url('../assets/images/fondo.png') no-repeat center center/cover;
-  height: 100vh;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: url('../assets/images/fondo.png') no-repeat center center;
+  background-size: cover;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  position: relative;
   z-index: 1;
 }
 
@@ -14,8 +17,10 @@
 .results-container::before {
   content: "";
   position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
+  top: 0;
+  left: 0;
+  width: 100%;                  /* nos aseguramos de que cubra todo el ancho */
+  height: 100%;
   background: rgba(0, 0, 0, 0.3);
   z-index: -1;
 }
@@ -31,7 +36,7 @@
   color: #fff;
   font-family: 'Georgia', serif;
   font-size: 2.5em;
-  margin-bottom: 20px;
+  margin: 0 0 20px;             /* sin margen superior, 20px debajo */
   text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.5);
   text-align: center;
 }
@@ -59,7 +64,7 @@
   background: rgba(255, 255, 255, 0.8);
   border-radius: 12px;
   padding: 10px;  /* Reducido el padding */
-  margin-top: 30px;
+  margin-top: 0px;
   width: 1000px;
   display: block;
   flex-direction: column;
@@ -69,10 +74,11 @@
   border-collapse: collapse;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
   height: 350px;
-  position: relative;  /* Modificado de "center" a "relative" */
+  position: relative;
 }
 
-.results-table th, .results-table td {
+.results-table th,
+.results-table td {
   padding: 10px;
   text-align: center;
   border: 1px solid #ddd;
@@ -188,11 +194,11 @@ button:hover {
 @media (max-width: 768px) {
   .results-table {
     width: 90%;
-    height: 300px;  /* Ajusta la altura para pantallas pequeñas */
-    font-size: 0.85em;  /* Reduce el tamaño de la fuente en pantallas pequeñas */
+    height: 300px;         /* Ajusta la altura para pantallas pequeñas */
+    font-size: 0.85em;      /* Reduce el tamaño de la fuente */
   }
 
   .results-container h2 {
-    font-size: 2em;  /* Título más pequeño en pantallas pequeñas */
+    font-size: 2em;         /* Título más pequeño en pantallas pequeñas */
   }
 }

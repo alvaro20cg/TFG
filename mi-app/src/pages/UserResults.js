@@ -1,3 +1,4 @@
+// src/pages/UserPanel.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
@@ -10,73 +11,67 @@ const UserPanel = () => {
   const [tests, setTests] = useState([]);
   const [userId, setUserId] = useState(null);
 
-  // Obtener el user_id del usuario actual al cargar el componente
+  // 1. Obtener el user_id del usuario autenticado
   useEffect(() => {
     const fetchUserId = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      
-      if (error) {
-        console.error("Error al obtener el usuario:", error);
-      } else if (user) {
-        console.log("Usuario autenticado:", user); 
-        console.log("Email del usuario:", user.email); 
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', user.email)
-          .single();
-
-        if (userError) {
-          console.error("Error al obtener el ID del usuario:", userError);
-        } else {
-          console.log("ID del usuario encontrado:", userData?.id); 
-          setUserId(userData?.id);
-        }
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('Error al obtener el usuario:', authError);
+        return;
+      }
+      // Traemos todas las filas que coincidan y elegimos la primera
+      const { data: rows, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', user.email);
+      if (userError) {
+        console.error('Error al obtener el ID del usuario:', userError);
+      } else if (rows && rows.length > 0) {
+        setUserId(rows[0].id);
       } else {
-        console.log("No hay usuario autenticado.");
+        console.warn('No se encontró ningún usuario con ese email.');
       }
     };
     fetchUserId();
   }, []);
 
-  // Función para obtener los tests pendientes del usuario actual
+  // 2. Obtener TODOS los tests del usuario (sin filtrar por estado)
   const fetchTests = async () => {
-    if (!userId) {
-      console.log("userId es null, no se puede obtener los tests.");
-      return;
-    }
-
+    if (!userId) return;
     const { data, error } = await supabase
       .from('test')
-      .select('*')
-      .eq('status', 'pendiente')
+      .select('id, nombre, test_type, status, configuration')
       .eq('user_id', userId);
-
     if (error) {
-      console.error("Error al obtener tests:", error);
+      console.error('Error al obtener tests:', error);
     } else {
-      console.log("Tests obtenidos:", data); 
       setTests(data);
     }
   };
 
-  const handleViewResults = () => {
-    alert("Aquí se mostrarán los resultados.");
-  };
-
-  const handlePerformTest = () => {
-    console.log("Obteniendo tests para el usuario con ID:", userId); 
-    fetchTests();
+  // 3. Cargar tests y abrir modal
+  const handlePerformTest = async () => {
+    await fetchTests();
     setShowTestsModal(true);
   };
 
-  // Agregamos testId al objeto state enviado a TestPage
+  // 4. Navegar a la página del test según su tipo
   const handleTestClick = (test) => {
-    navigate('/testpage', { state: { ...test.configuration, testId: test.id } });
+    const navState = { state: { ...test.configuration, testId: test.id } };
+    if (test.test_type === 'letras') {
+      navigate('/testpage2', navState);
+    } else {
+      // para caras u otros tipos
+      navigate('/testpage', navState);
+    }
   };
 
   const handleCloseModal = () => {
     setShowTestsModal(false);
+  };
+
+  const handleViewResults = () => {
+    navigate('/results');
   };
 
   return (
@@ -93,24 +88,32 @@ const UserPanel = () => {
           </button>
         </div>
       </div>
-      
+
       {showTestsModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h3>Tests Disponibles</h3>
             {tests.length > 0 ? (
               <ul className="tests-list">
-                {tests.map((test) => (
+                {tests.map(test => (
                   <li key={test.id} className="test-item">
-                    <span>Test ID: {test.id}</span>
-                    <button className="start-test-btn" onClick={() => handleTestClick(test)}>
+                    <div>
+                      <strong>{test.nombre}</strong>{' '}
+                      <small>
+                        (ID: {test.id} ― {test.test_type} ― {test.status})
+                      </small>
+                    </div>
+                    <button
+                      className="start-test-btn"
+                      onClick={() => handleTestClick(test)}
+                    >
                       Iniciar Test
                     </button>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p>No hay tests disponibles</p>
+              <p>No hay tests disponibles para ti.</p>
             )}
             <button className="close-modal-btn" onClick={handleCloseModal}>
               Cerrar
