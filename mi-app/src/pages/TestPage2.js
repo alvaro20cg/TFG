@@ -1,9 +1,10 @@
 // src/pages/TestPage2.js
+import './TestPage2.css';
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
 
-import './TestPage2.css';
+
 
 // Genera posiciones aleatorias sin superposición
 function generateNonOverlappingPositions(numStimuli, minDistance, containerWidth, containerHeight) {
