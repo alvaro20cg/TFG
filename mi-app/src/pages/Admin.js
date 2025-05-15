@@ -54,6 +54,11 @@ const Admin = () => {
                 Letras
               </button>
             </div>
+            <div>
+              <button className="admin-btn" onClick={closeModal}>
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

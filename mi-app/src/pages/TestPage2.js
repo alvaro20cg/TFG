@@ -1,8 +1,8 @@
-import './TestPage2.css';
+
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
-
+import './testPage2.css';
 
 
 // Genera posiciones aleatorias sin superposición
