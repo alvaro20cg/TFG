@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
 import './TestPage.css';
@@ -32,6 +32,7 @@ const TestPage = () => {
   const [positions, setPositions] = useState([]);
   const [results, setResults] = useState([]);
   const [showPreview, setShowPreview] = useState(true);
+  const [countdown, setCountdown] = useState(5);
   const [eyeTrackingData, setEyeTrackingData] = useState([]);
 
   const rounds = state?.rounds || [];
@@ -41,6 +42,7 @@ const TestPage = () => {
   const targetFolder = currentRoundData.targetFolder;
 
   useEffect(() => {
+    // Pre-carga de imágenes
     originalImages.forEach(imgData => {
       const img = new Image();
       img.src = imgData.url;
@@ -56,7 +58,7 @@ const TestPage = () => {
       return parts[3] === targetLetter;
     });
     return found || originalImages.find(img => img.folder === targetFolder);
-  }, [originalImages, targetFolder, selectedVersion, state.selectedEmotion]);
+  }, [originalImages, targetFolder, state.selectedEmotion]);
 
   const generateNonOverlappingPositions = (numImages) => {
     const pos = [];
@@ -95,6 +97,7 @@ const TestPage = () => {
 
   const displayImages = originalImages;
 
+  // Genera posiciones cuando termina el preview
   useEffect(() => {
     if (!showPreview) {
       setPositions(generateNonOverlappingPositions(displayImages.length));
@@ -102,23 +105,38 @@ const TestPage = () => {
     }
   }, [currentRoundIndex, displayImages.length, showPreview]);
 
+  // Contador de 5 segundos para la vista previa
+  useEffect(() => {
+    let timer;
+    if (showPreview) {
+      setCountdown(5);
+      timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setShowPreview(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [currentRoundIndex, showPreview]);
+
   const generateHeatmap = () => {
     const heatmapInstance = heatmap.create({
       container: document.querySelector('.heatmap-container'),
-      radius: 50,  // Tamaño de los puntos del mapa de calor
+      radius: 50,
       maxOpacity: 0.6,
       minOpacity: 0.1,
       blur: 0.9
     });
-
-    // Procesa los datos de seguimiento ocular para adaptarlos al mapa de calor
     const points = eyeTrackingData.map(data => ({
       x: data.x,
       y: data.y,
       value: 1
     }));
-
-    // Cargar los puntos en el mapa de calor
     heatmapInstance.setData({ max: 1, data: points });
   };
 
@@ -128,40 +146,24 @@ const TestPage = () => {
     }
   }, [eyeTrackingData]);
 
-  // Función para generar y guardar el CSV con los resultados del test
-  const generateCSVContent = () => {
-    const header = "round,reactionTime,result\n";
-    return results.reduce((acc, curr) => acc + `${curr.round},${curr.reactionTime},${curr.result}\n`, header);
-  };
-
-  // Función para guardar el CSV en Supabase
   const saveCSVToSupabase = async (csvContent) => {
     if (!testId) return;
-    try {
-      const { error } = await supabase
-        .from('csv_logs')
-        .insert([{ test_id: testId, csv_content: csvContent }]);
-      if (error) console.error("Error al guardar CSV:", error);
-    } catch (err) {
-      console.error("Error en saveCSVToSupabase:", err);
-    }
+    const { error } = await supabase
+      .from('csv_logs')
+      .insert([{ test_id: testId, csv_content: csvContent }]);
+    if (error) console.error("Error al guardar CSV:", error);
   };
 
-  // Función para guardar los resultados del test en Supabase
   const saveTestResults = async (duration, correctCount, errorCount) => {
-    try {
-      const { error } = await supabase
-        .from('test_results')
-        .insert([{ test_id: testId, duration, correct_count: correctCount, error_count: errorCount }]);
-      if (error) console.error("Error al guardar resultados:", error);
-    } catch (err) {
-      console.error("Error en saveTestResults:", err);
-    }
+    const { error } = await supabase
+      .from('test_results')
+      .insert([{ test_id: testId, duration, correct_count: correctCount, error_count: errorCount }]);
+    if (error) console.error("Error al guardar resultados:", error);
   };
 
   const finalizeTest = async (finalResults) => {
     const csvContent = finalResults.reduce(
-      (acc, curr) => acc + `${curr.round},${curr.reactionTime},${curr.result}\n`, 
+      (acc, curr) => acc + `${curr.round},${curr.reactionTime},${curr.result}\n`,
       "round,reactionTime,result\n"
     );
     await saveCSVToSupabase(csvContent);
@@ -173,21 +175,15 @@ const TestPage = () => {
       .from('test')
       .update({ status: 'finalizado' })
       .match({ id: testId });
-    if (error) {
-      console.error("Error al actualizar test:", error);
-    }
+    if (error) console.error("Error al actualizar test:", error);
     navigate('/userresults');
   };
 
   const handleImageClick = (img) => {
     if (showPreview) return;
-    const clickTime = Date.now();
-    const reactionTime = clickTime - roundStartTime;
+    const reactionTime = Date.now() - roundStartTime;
     const isCorrect = img.id === targetImage.id;
     const resultStr = isCorrect ? "acertado" : "fallado";
-
-    console.log("imagen target:", targetImage, "imagen elegida:", img, resultStr);
-
     const newResult = { round: currentRoundIndex + 1, reactionTime, result: resultStr };
     const updatedResults = [...results, newResult];
 
@@ -198,7 +194,7 @@ const TestPage = () => {
     } else {
       setResults(updatedResults);
       alert("Test finalizado");
-      finalizeTest(updatedResults);  // Aquí llamamos a finalizeTest
+      finalizeTest(updatedResults);
     }
   };
 
@@ -209,22 +205,21 @@ const TestPage = () => {
         <div className="target-info">Busca: {targetFolder}</div>
         <button className="cancel-btn" onClick={() => navigate('/userresults')}>Cancelar Test</button>
       </div>
+
       {showPreview && targetImage ? (
         <div className="preview-container">
           <img className="preview-image" src={targetImage.url} alt={`Target ${targetImage.id}`} />
           <p className="preview-text">Observa la imagen target</p>
+          <p className="countdown">Comienza en {countdown}...</p>
         </div>
       ) : (
         <div className="images-container" style={{ position: 'relative' }}>
-          <div className="heatmap-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}></div>
+          <div className="heatmap-container"
+               style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
           {displayImages.map((img, index) => (
             <div
               key={img.id}
-              style={{
-                position: 'absolute',
-                cursor: 'pointer',
-                ...positions[index]
-              }}
+              style={{ position: 'absolute', cursor: 'pointer', ...positions[index] }}
               onClick={() => handleImageClick(img)}
             >
               <img
@@ -232,7 +227,7 @@ const TestPage = () => {
                 alt={`Imagen ${img.id}`}
                 style={{ width: '100%', height: '80%', objectFit: 'cover' }}
               />
-              <p style={{ margin: '0', fontSize: '0.7rem', textAlign: 'center' }}>{img.file}</p>
+              <p style={{ margin: 0, fontSize: '0.7rem', textAlign: 'center' }}>{img.file}</p>
             </div>
           ))}
         </div>

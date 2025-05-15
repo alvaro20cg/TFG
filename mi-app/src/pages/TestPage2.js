@@ -1,5 +1,4 @@
-// src/pages/TestPage2.js
-//import './TestPage2.css';
+import './TestPage2.css';
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
