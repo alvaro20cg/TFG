@@ -13,12 +13,12 @@ const Admin = () => {
 
   const goToConfigurarTest = () => {
     closeModal();
-    navigate('/configurar-test');  // Apunta a ConfigurarTest.js
+    navigate('/configurar-test');
   };
   const goToConfigurarLetras = () => {
     closeModal();
-    navigate('/configurar-letras');  // Apunta a ConfigurarLetras.js
-  }
+    navigate('/configurar-letras');
+  };
 
   return (
     <>
@@ -45,6 +45,15 @@ const Admin = () => {
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal" onClick={e => e.stopPropagation()}>
+            {/* Botón de cierre */}
+            <button
+              className="modal-close"
+              onClick={closeModal}
+              aria-label="Cerrar"
+            >
+              &times;
+            </button>
+
             <h2>¿Qué tipo de test quieres configurar?</h2>
             <div className="modal-buttons">
               <button className="admin-btn" onClick={goToConfigurarTest}>
@@ -52,11 +61,6 @@ const Admin = () => {
               </button>
               <button className="admin-btn" onClick={goToConfigurarLetras}>
                 Letras
-              </button>
-            </div>
-            <div>
-              <button className="admin-btn" onClick={closeModal}>
-                Cancelar
               </button>
             </div>
           </div>

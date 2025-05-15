@@ -210,7 +210,7 @@ const ConfigurarTest = () => {
       <div className="selection-wrapper">
         <div className="selection-container">
           <div className="people-selection">
-            <h3>Selecciona las carpetas (personas):</h3>
+            <h3>Selecciona las carpetas</h3>
             {people.map(person => {
               const folderImageUrl = getFolderImage(person);
               return (

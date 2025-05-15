@@ -67,11 +67,6 @@
   box-shadow: 0px 6px 10px rgba(255, 105, 180, 0.4);
 }
 
-/* ----------------------------- */
-/* Estilos para el Modal de Tests */
-/* ----------------------------- */
-
-/* Overlay del modal: cubre toda la ventana con un fondo semitransparente */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -85,7 +80,6 @@
   z-index: 1000;
 }
 
-/* Contenedor del contenido del modal */
 .modal-content {
   background: #fff;
   padding: 20px 30px;
@@ -121,14 +115,15 @@
 
 /* Botón para iniciar el test */
 .start-test-btn {
-  background: #ff69b4;
+  background: linear-gradient(135deg, #ff9a9e, #fad0c4); /* degradado rosa pastel */
+  color: #fff;
+  font-size: 18px;
   border: none;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 5px;
+  border-radius: 30px;
+  padding: 10px 20px;
   cursor: pointer;
-  font-size: 16px;
-  transition: background 0.3s ease;
+  transition: all 0.3s ease;
+  box-shadow: 0px 4px 6px rgba(255, 105, 180, 0.3);
 }
 
 .start-test-btn:hover {
@@ -137,16 +132,15 @@
 
 /* Botón para cerrar el modal */
 .close-modal-btn {
-  background: #ff6f91;
+  background: linear-gradient(135deg, #ff9a9e, #fad0c4); /* degradado rosa pastel */
+  color: #fff;
+  font-size: 18px;
   border: none;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 5px;
+  border-radius: 30px;
+  padding: 10px 20px;
   cursor: pointer;
-  font-size: 16px;
-  transition: background 0.3s ease;
-  margin-top: 15px;
-  width: 100%;
+  transition: all 0.3s ease;
+  box-shadow: 0px 4px 6px rgba(255, 105, 180, 0.3);
 }
 
 .close-modal-btn:hover {

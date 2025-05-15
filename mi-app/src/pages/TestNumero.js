@@ -112,7 +112,7 @@ const TestNumero = () => {
   const markTestDone = async () => {
     const { error } = await supabase
       .from('test')
-      .update({ status: 'realizado' })
+      .update({ status: 'finalizado' })
       .eq('id', testId);
     if (error) console.error('Error actualizando status en test:', error);
   };

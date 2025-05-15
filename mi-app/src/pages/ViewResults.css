@@ -1,204 +1,104 @@
+/* src/pages/ViewResults.css */
+
 .results-container {
   position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  background: url('../assets/images/fondo.png') no-repeat center center;
-  background-size: cover;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  align-items: center;
+  top: 0; bottom: 0; left: 0; right: 0;
+  background: url('../assets/images/fondo.png') no-repeat center center/cover;
+  display: flex; flex-direction: column; align-items: center;
   z-index: 1;
 }
-
-/* Overlay semitransparente */
 .results-container::before {
   content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;                  /* nos aseguramos de que cubra todo el ancho */
-  height: 100%;
-  background: rgba(0, 0, 0, 0.3);
-  z-index: -1;
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.3); z-index: -1;
 }
-
-/* Asegura que el contenido quede por encima del overlay */
-.results-container > * {
-  position: relative;
-  z-index: 2;
-}
-
-/* Título */
+.results-container > * { position: relative; z-index: 2; }
 .results-container h2 {
-  color: #fff;
-  font-family: 'Georgia', serif;
-  font-size: 2.5em;
-  margin: 0 0 20px;             /* sin margen superior, 20px debajo */
-  text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.5);
+  color: #fff; font-family: Georgia, serif; font-size: 2.5em;
+  margin: 0 0 20px; text-shadow: 1px 1px 5px rgba(0,0,0,0.5);
   text-align: center;
 }
 
-/* Botón Atrás */
-.back-btn {
-  background-color: #ff9a9e;
-  color: white;
-  font-size: 16px;
-  padding: 10px 20px;
-  border-radius: 30px;
-  cursor: pointer;
-  transition: 0.3s ease;
-  border: none;
-  margin-top: 20px;
-}
-
-.back-btn:hover {
-  background-color: #fad0c4;
-  transform: scale(1.05);
-}
-
-/* Tabla de resultados */
+/* Tabla más ancha */
 .results-table {
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 12px;
-  padding: 10px;  /* Reducido el padding */
-  margin-top: 0px;
-  width: 1000px;
-  display: block;
-  flex-direction: column;
-  gap: 10px;  /* Reducido el gap */
-  overflow-x: auto;
-  overflow-y: auto;
-  border-collapse: collapse;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-  height: 350px;
+  background: rgba(255,255,255,0.8);
+  border-radius: 12px; margin-top: 150px;
+  width: 1300px;  /* aumentada */
+  display: block; height: 400px;
+  overflow: auto; border-collapse: collapse;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
   position: relative;
 }
-
 .results-table th,
 .results-table td {
-  padding: 10px;
-  text-align: center;
-  border: 1px solid #ddd;
+  padding: 10px; text-align: center; border: 1px solid #ddd;
 }
-
 .results-table th {
-  background-color: #fad0c4;
-  color: #333;
+  background-color: #fad0c4; color: #333;
+  position: sticky; top: 0; z-index: 2;
 }
 
-.results-table tbody tr:nth-child(even) {
-  background-color: #f9f9f9;
+.filter-row th {
+  background: #fff; position: sticky; top: 40px; z-index: 1;
+}
+.filter-row select {
+  width: 100%; padding: 5px; border: 1px solid #ddd;
+  border-radius: 5px; background: #fafafa; box-sizing: border-box;
 }
 
-.results-table tbody tr:hover {
-  background-color: #f1f1f1;
-}
-
-.results-table input {
-  background-color: #fff;
-  border: 1px solid #ddd;
-  padding: 5px;
-  border-radius: 5px;
-  width: 100%;
-}
-
-/* Botón de editar, guardar, eliminar y ver resultados */
-button {
-  background-color: #ff9a9e;
-  color: white;
-  border-radius: 30px;
-  padding: 8px 16px;
-  border: none;
-  cursor: pointer;
-  transition: 0.3s ease;
-}
-
-button:hover {
-  background-color: #fad0c4;
-  transform: scale(1.05);
-}
-
-.confirm-delete {
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 20px;
-  border-radius: 5px;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-}
-
-.confirm-delete button {
-  background-color: #ff9a9e;
-  color: white;
-  padding: 10px 20px;
-  border-radius: 5px;
-  cursor: pointer;
-  margin: 5px;
-}
-
-.confirm-delete button:hover {
-  background-color: #fad0c4;
-}
-
-/* Modal de resultados centrado */
-.results-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
+/* Botones en horizontal */
+.actions-cell {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  gap: 10px;
 }
 
-.results-modal .modal-content {
-  background: rgba(255, 255, 255, 0.9);
-  padding: 20px;
-  border-radius: 10px;
-  max-width: 80%;
-  max-height: 80%;
-  overflow-y: auto;
+/* Botones */
+.export-btn,
+.delete-btn,
+.back-btn {
+  background-color: #ff9a9e; color: #fff;
+  border: none; border-radius: 30px;
+  padding: 8px 16px; cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s;
 }
-
-/* Botón cerrar modal */
-.close-modal-btn {
-  margin-top: 20px;
+.export-btn:hover,
+.back-btn:hover {
+  background-color: #fad0c4; transform: scale(1.05);
+}
+.delete-btn {
   background-color: #ff9a9e;
-  color: white;
-  padding: 10px 20px;
-  border-radius: 5px;
-  border: none;
-  cursor: pointer;
-  transition: 0.3s ease;
-  width: 25%;
+}
+.delete-btn:hover {
+  background-color: #c0392b; transform: scale(1.05);
 }
 
-.close-modal-btn:hover {
-  background-color: #fad0c4;
+.back-btn { margin: 20px; }
+
+/* Modal de confirmación */
+.delete-modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 1001;
+}
+.delete-modal {
+  background: #fff; border-radius: 8px; padding: 20px;
+  max-width: 300px; width: 80%; text-align: center;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+.delete-modal p {
+  margin-bottom: 20px; font-size: 1.1em; color: #333;
+}
+.delete-modal .modal-buttons {
+  display: flex; justify-content: center; gap: 10px;
+}
+.delete-modal .modal-buttons button {
+  width: 100px;
 }
 
-.button .results-table {
-  margin-left: 100px;
-}
-
-/* Hacer la tabla más responsiva */
 @media (max-width: 768px) {
-  .results-table {
-    width: 90%;
-    height: 300px;         /* Ajusta la altura para pantallas pequeñas */
-    font-size: 0.85em;      /* Reduce el tamaño de la fuente */
-  }
-
-  .results-container h2 {
-    font-size: 2em;         /* Título más pequeño en pantallas pequeñas */
-  }
+  .results-table { width: 90%; height: 300px; }
+  .results-container h2 { font-size: 2em; }
 }

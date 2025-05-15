@@ -1,3 +1,4 @@
+// src/pages/ViewPatients.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
@@ -6,12 +7,12 @@ import supabase from '../config/supabase';
 
 const ViewPatients = () => {
   const [patients, setPatients] = useState([]);
+  const [filters, setFilters] = useState({ id: '', name: '', email: '', role: '' });
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [error, setError] = useState(null);
-  // Estados para el modal de resultados
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [patientResults, setPatientResults] = useState([]);
   const navigate = useNavigate();
@@ -22,17 +23,42 @@ const ViewPatients = () => {
         .from('users')
         .select('id, first_name, last_name, email, role')
         .eq('role', 'user');
-
       if (error) {
-        console.error('Error fetching patients:', error);
+        console.error('Error al obtener pacientes:', error);
         setError(error.message);
       } else {
         setPatients(data);
       }
     };
-
     fetchPatients();
   }, []);
+
+  // Función para traducir roles
+  const translateRole = (role) => {
+    if (role === 'user') return 'Usuario';
+    return role;
+  };
+
+  // Opciones únicas para cada desplegable
+  const idOptions    = [...new Set(patients.map(p => p.id.toString()))];
+  const nameOptions  = [...new Set(patients.map(p => `${p.first_name} ${p.last_name}`))];
+  const emailOptions = [...new Set(patients.map(p => p.email))];
+  const roleOptions  = [...new Set(patients.map(p => p.role))];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Filtrado exacto según desplegables
+  const filteredPatients = patients.filter(patient => {
+    const idMatch    = !filters.id    || patient.id.toString() === filters.id;
+    const fullName   = `${patient.first_name} ${patient.last_name}`;
+    const nameMatch  = !filters.name  || fullName === filters.name;
+    const emailMatch = !filters.email || patient.email === filters.email;
+    const roleMatch  = !filters.role  || patient.role === filters.role;
+    return idMatch && nameMatch && emailMatch && roleMatch;
+  });
 
   const handleEdit = (patient) => {
     setEditData({ ...patient });
@@ -40,7 +66,6 @@ const ViewPatients = () => {
   };
 
   const handleSave = async () => {
-    // Actualiza solo los campos editables en la tabla "users"
     const { error } = await supabase
       .from('users')
       .update({
@@ -57,9 +82,8 @@ const ViewPatients = () => {
         .from('users')
         .select('id, first_name, last_name, email, role')
         .eq('role', 'user');
-
       if (fetchError) {
-        console.error('Error al obtener los pacientes actualizados:', fetchError);
+        console.error('Error al recargar pacientes:', fetchError);
       } else {
         setPatients(data);
       }
@@ -68,10 +92,7 @@ const ViewPatients = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setEditData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setEditData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleDelete = (patient) => {
@@ -80,19 +101,18 @@ const ViewPatients = () => {
   };
 
   const confirmDeletion = async () => {
-    if (selectedPatient) {
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', selectedPatient.id);
+    if (!selectedPatient) return;
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', selectedPatient.id);
 
-      if (error) {
-        console.error('Error al eliminar paciente:', error);
-      } else {
-        setPatients(patients.filter((patient) => patient.id !== selectedPatient.id));
-        setConfirmDelete(false);
-        setSelectedPatient(null);
-      }
+    if (error) {
+      console.error('Error al eliminar paciente:', error);
+    } else {
+      setPatients(prev => prev.filter(p => p.id !== selectedPatient.id));
+      setConfirmDelete(false);
+      setSelectedPatient(null);
     }
   };
 
@@ -101,11 +121,8 @@ const ViewPatients = () => {
     setSelectedPatient(null);
   };
 
-  // Función para obtener los resultados del paciente.
-  // Primero se consulta la tabla "test" para obtener los test_ids del paciente,
-  // y luego se consultan los resultados de esos tests en "test_results".
+  // Modal de resultados (sin botón que lo abra)
   const fetchPatientResults = async (patientId) => {
-    // Obtener los tests del paciente
     const { data: testsData, error: testsError } = await supabase
       .from('test')
       .select('id')
@@ -115,32 +132,24 @@ const ViewPatients = () => {
       console.error('Error al obtener tests del paciente:', testsError);
       return;
     }
-    if (!testsData || testsData.length === 0) {
+    if (!testsData.length) {
       setPatientResults([]);
       setShowResultsModal(true);
       return;
     }
 
-    const testIds = testsData.map(test => test.id);
-
-    // Obtener los resultados correspondientes a los tests del paciente
+    const testIds = testsData.map(t => t.id);
     const { data, error } = await supabase
       .from('test_results')
       .select('*')
       .in('test_id', testIds);
 
     if (error) {
-      console.error('Error al obtener resultados del paciente:', error);
+      console.error('Error al obtener resultados:', error);
     } else {
       setPatientResults(data);
       setShowResultsModal(true);
     }
-  };
-
-  // Muestra el modal con resultados para el paciente seleccionado
-  const handleViewResults = (patient) => {
-    fetchPatientResults(patient.id);
-    setSelectedPatient(patient);
   };
 
   const closeResultsModal = () => {
@@ -149,17 +158,15 @@ const ViewPatients = () => {
     setSelectedPatient(null);
   };
 
-  const handleBack = () => {
-    navigate(-1);
-  };
+  const handleBack = () => navigate(-1);
 
   return (
     <>
-      <Header />
       <div className="view-patients-container">
+        <Header />
         <h1>Ver Pacientes</h1>
         {error && <p className="error-message">{error}</p>}
-        
+
         {confirmDelete && (
           <div className="confirm-delete">
             <p>¿Estás seguro de que deseas eliminar este paciente?</p>
@@ -177,10 +184,39 @@ const ViewPatients = () => {
               <th>Rol</th>
               <th>Acciones</th>
             </tr>
+            <tr className="filter-row">
+              <th>
+                <select name="id" value={filters.id} onChange={handleFilterChange}>
+                  <option value="">Todos</option>
+                  {idOptions.map(id => <option key={id} value={id}>{id}</option>)}
+                </select>
+              </th>
+              <th>
+                <select name="name" value={filters.name} onChange={handleFilterChange}>
+                  <option value="">Todos</option>
+                  {nameOptions.map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
+              </th>
+              <th>
+                <select name="email" value={filters.email} onChange={handleFilterChange}>
+                  <option value="">Todos</option>
+                  {emailOptions.map(email => <option key={email} value={email}>{email}</option>)}
+                </select>
+              </th>
+              <th>
+                <select name="role" value={filters.role} onChange={handleFilterChange}>
+                  <option value="">Todos</option>
+                  {roleOptions.map(role => (
+                    <option key={role} value={role}>{translateRole(role)}</option>
+                  ))}
+                </select>
+              </th>
+              <th></th>
+            </tr>
           </thead>
           <tbody>
-            {patients.length > 0 ? (
-              patients.map((patient) => (
+            {filteredPatients.length > 0 ? (
+              filteredPatients.map(patient => (
                 <tr key={patient.id}>
                   <td>{patient.id}</td>
                   <td>
@@ -215,7 +251,7 @@ const ViewPatients = () => {
                       patient.email
                     )}
                   </td>
-                  <td>{patient.role}</td>
+                  <td>{translateRole(patient.role)}</td>
                   <td>
                     {isEditing && editData.id === patient.id ? (
                       <>
@@ -223,9 +259,7 @@ const ViewPatients = () => {
                         <button onClick={() => handleDelete(patient)}>Eliminar</button>
                       </>
                     ) : (
-                      <>
-                        <button onClick={() => handleEdit(patient)}>Editar</button>
-                      </>
+                      <button onClick={() => handleEdit(patient)}>Editar</button>
                     )}
                   </td>
                 </tr>
@@ -237,6 +271,7 @@ const ViewPatients = () => {
             )}
           </tbody>
         </table>
+
         <button className="back-btn" onClick={handleBack}>
           Atrás
         </button>
@@ -244,9 +279,7 @@ const ViewPatients = () => {
         {showResultsModal && (
           <div className="results-modal">
             <div className="modal-content">
-              <h2>
-                Resultados de {selectedPatient.first_name} {selectedPatient.last_name}
-              </h2>
+              <h2>Resultados de {selectedPatient.first_name} {selectedPatient.last_name}</h2>
               {patientResults.length > 0 ? (
                 <table className="results-table">
                   <thead>
@@ -259,7 +292,7 @@ const ViewPatients = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {patientResults.map((result) => (
+                    {patientResults.map(result => (
                       <tr key={result.id}>
                         <td>{result.test_id}</td>
                         <td>{result.duration} ms</td>
