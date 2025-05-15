@@ -1,26 +1,25 @@
 // src/pages/TestPage2.js
-import React, { useState } from 'react';
-import './TestPage2.css'; // Asegúrate de que aquí importes el CSS con las clases tp2-
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import supabase from '../supabaseClient';
+import './TestPage2.css';
 
-// Función para generar posiciones aleatorias sin superposición
+// Genera posiciones aleatorias sin superposición
 function generateNonOverlappingPositions(numStimuli, minDistance, containerWidth, containerHeight) {
   const positions = [];
   const maxAttempts = 1000;
   for (let i = 0; i < numStimuli; i++) {
-    let attempts = 0;
-    let newPos;
+    let attempts = 0, newPos;
     while (attempts < maxAttempts) {
       newPos = {
         x: Math.random() * (containerWidth - 50),
-        y: Math.random() * (containerHeight - 50)
+        y: Math.random() * (containerHeight - 50),
       };
       if (i === 0) {
         positions.push(newPos);
         break;
       } else {
-        const dists = positions.map(pos =>
-          Math.hypot(pos.x - newPos.x, pos.y - newPos.y)
-        );
+        const dists = positions.map(p => Math.hypot(p.x - newPos.x, p.y - newPos.y));
         if (dists.every(d => d >= minDistance)) {
           positions.push(newPos);
           break;
@@ -36,22 +35,40 @@ function generateNonOverlappingPositions(numStimuli, minDistance, containerWidth
 }
 
 const TestPage2 = () => {
-  // Dimensiones del área de prueba
+  const { state } = useLocation();
+  const navigate = useNavigate();
+  const testId = state?.testId;
+
+  useEffect(() => {
+    if (!testId) navigate('/');
+  }, [testId, navigate]);
+
   const containerWidth = 750;
   const containerHeight = 550;
 
-  // Estados para gestionar la prueba
-  const [currentPart, setCurrentPart] = useState(null); // 'A', 'B' o 'finished'
-  const [sequence, setSequence] = useState([]);
-  const [positions, setPositions] = useState([]);
-  const [clicks, setClicks] = useState(0);
-  const [errors, setErrors] = useState(0);
-  const [startTime, setStartTime] = useState(null);
+  // Estados de la prueba
+  const [currentPart, setCurrentPart]       = useState(null); // 'A' | 'B' | 'finished'
+  const [sequence, setSequence]             = useState([]);
+  const [positions, setPositions]           = useState([]);
+  const [clicks, setClicks]                 = useState(0);
+  const [errors, setErrors]                 = useState(0);
+  const [startTime, setStartTime]           = useState(null);
   const [buttonStatuses, setButtonStatuses] = useState([]);
-  const [results, setResults] = useState([]);
+  const [results, setResults]               = useState([]);
+
+  // Estado global de inicio para duración total
+  const [testStartTime, setTestStartTime]   = useState(null);
+
+  // Estados para el modal de comentario
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [commentText, setCommentText]           = useState('');
+  const [commentSubmitted, setCommentSubmitted] = useState(false);
 
   // Inicia la prueba (Parte A o B)
   const startTest = (part) => {
+    if (part === 'A') {
+      setTestStartTime(Date.now());
+    }
     let seq = [];
     if (part === 'A') {
       seq = Array.from({ length: 25 }, (_, i) => (i + 1).toString());
@@ -66,25 +83,82 @@ const TestPage2 = () => {
     setErrors(0);
     setStartTime(Date.now());
     setButtonStatuses(Array(seq.length).fill('default'));
-    setPositions(generateNonOverlappingPositions(seq.length, 80, containerWidth, containerHeight));
+    setPositions(generateNonOverlappingPositions(
+      seq.length, 80, containerWidth, containerHeight
+    ));
   };
 
-  // Maneja clics en los estímulos
-  const handleButtonClick = (index) => {
+  // Guarda cada parte en trail_results
+  const savePartResult = async (part, time, errors) => {
+    const { error } = await supabase
+      .from('trail_results')
+      .insert([{ test_id: testId, part, time, errors, created_at: new Date() }]);
+    if (error) console.error('Error guardando parte en Supabase:', error);
+  };
+
+  // Guarda el resumen global en test_results
+  const saveTestResults = async () => {
+    const duration = parseFloat(((Date.now() - testStartTime) / 1000).toFixed(2));
+    const correctCount = results.reduce((sum, r) => sum + 1, 0);
+    const errorCount = results.reduce((sum, r) => sum + r.errors, 0);
+    const { error } = await supabase
+      .from('test_results')
+      .insert([{ test_id: testId, duration, correct_count: correctCount, error_count: errorCount, created_at: new Date() }]);
+    if (error) console.error('Error guardando test_results en Supabase:', error);
+  };
+
+  // Actualiza estado del test a "realizado"
+  const markTestDone = async () => {
+    const { error } = await supabase
+      .from('test')
+      .update({ status: 'realizado' })
+      .eq('id', testId);
+    if (error) console.error('Error actualizando status en test:', error);
+  };
+
+  // Guarda el comentario en trail_comments
+  const saveComment = async () => {
+    if (!commentText.trim()) {
+      alert('El comentario no puede estar vacío.');
+      return;
+    }
+    const { error } = await supabase
+      .from('trail_comments')
+      .insert([{ test_id: testId, part: 'general', comment: commentText }]);
+    if (error) {
+      console.error('Error guardando comentario:', error);
+      alert('Hubo un error guardando tu comentario.');
+      return;
+    }
+    await markTestDone();
+    setShowCommentModal(false);
+    setCommentSubmitted(true);
+    alert('¡Gracias por tu feedback!');
+  };
+
+  // Maneja clics en los botones
+  const handleButtonClick = async (index) => {
     if (buttonStatuses[index] === 'correct') return;
+
     if (index === clicks) {
       const updated = [...buttonStatuses];
       updated[index] = 'correct';
       setButtonStatuses(updated);
       setClicks(c => c + 1);
+
       if (clicks + 1 === sequence.length) {
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        const elapsed = parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
         alert(`Parte ${currentPart} completada en ${elapsed} s con ${errors} errores`);
+
+        await savePartResult(currentPart, elapsed, errors);
         setResults(r => [...r, { part: currentPart, time: elapsed, errors }]);
+
         if (currentPart === 'A') {
           setTimeout(() => startTest('B'), 2000);
         } else {
           setCurrentPart('finished');
+          await saveTestResults();
+          setShowCommentModal(true);
         }
       }
     } else {
@@ -101,70 +175,42 @@ const TestPage2 = () => {
     }
   };
 
-  // Renderiza área de estímulos
+  // Renderers completos
   const renderTestArea = () => (
-    <div
-      style={{
-        width: containerWidth,
-        height: containerHeight,
-        position: 'relative',
-        margin: '0 auto',
-        border: '1px solid #ccc'
-      }}
-    >
+    <div className="tp2-test-area">
       {sequence.map((item, i) => {
         const pos = positions[i] || { x: 0, y: 0 };
-        let bg = '#f0f0f0';
-        if (buttonStatuses[i] === 'correct') bg = '#b3e5b3';
-        if (buttonStatuses[i] === 'error') bg = '#f28b82';
         return (
           <button
             key={i}
+            className={`tp2-stimulus ${buttonStatuses[i]}`}
             onClick={() => handleButtonClick(i)}
             disabled={buttonStatuses[i] === 'correct'}
-            style={{
-              position: 'absolute',
-              left: pos.x,
-              top: pos.y,
-              width: 50,
-              height: 50,
-              backgroundColor: bg,
-              borderRadius: 5,
-              border: '1px solid #999',
-              fontSize: 16,
-              cursor: 'pointer',
-              transition: 'background-color 0.2s ease'
-            }}
+            style={{ left: pos.x, top: pos.y }}
           >
             {item}
           </button>
         );
       })}
-      {/* Etiquetas inicio/fin */}
       {sequence.length > 0 && positions[0] && (
-        <div style={{
-          position: 'absolute',
-          left: positions[0].x,
-          top: positions[0].y - 20,
-          width: 50,
-          textAlign: 'center',
-          fontSize: 12
-        }}>inicio</div>
+        <div className="tp2-label" style={{ left: positions[0].x, top: positions[0].y - 20 }}>
+          inicio
+        </div>
       )}
       {sequence.length > 0 && positions[sequence.length - 1] && (
-        <div style={{
-          position: 'absolute',
-          left: positions[sequence.length - 1].x,
-          top: positions[sequence.length - 1].y - 20,
-          width: 50,
-          textAlign: 'center',
-          fontSize: 12
-        }}>fin</div>
+        <div
+          className="tp2-label"
+          style={{
+            left: positions[sequence.length - 1].x,
+            top: positions[sequence.length - 1].y - 20
+          }}
+        >
+          fin
+        </div>
       )}
     </div>
   );
 
-  // Renderiza resultados finales
   const renderResults = () => (
     <div className="tp2-results-container">
       <h2>Resultados Finales</h2>
@@ -189,7 +235,6 @@ const TestPage2 = () => {
     </div>
   );
 
-  // Pantalla inicial
   const renderInstructions = () => (
     <div className="tp2-instructions-container">
       <div className="tp2-welcome">Trail Making Test</div>
@@ -211,6 +256,26 @@ const TestPage2 = () => {
           {renderTestArea()}
           {renderResults()}
         </>
+      )}
+
+      {showCommentModal && (
+        <div className="tp2-comment-overlay">
+          <div className="tp2-comment-modal">
+            <h2>Comentario</h2>
+            <textarea
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              placeholder="Escribe aquí tu feedback…"
+            />
+            <button onClick={saveComment}>Enviar</button>
+          </div>
+        </div>
+      )}
+
+      {commentSubmitted && (
+        <button className="tp2-back-btn" onClick={() => navigate(-1)}>
+          Atrás
+        </button>
       )}
     </div>
   );

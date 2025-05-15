@@ -104,7 +104,7 @@ const UserPanel = () => {
                       </small>
                     </div>
                     <button
-                      className="start-test-btn"
+                      className="back-btn"
                       onClick={() => handleTestClick(test)}
                     >
                       Iniciar Test
@@ -115,7 +115,7 @@ const UserPanel = () => {
             ) : (
               <p>No hay tests disponibles para ti.</p>
             )}
-            <button className="close-modal-btn" onClick={handleCloseModal}>
+            <button className="back-btn" onClick={handleCloseModal}>
               Cerrar
             </button>
           </div>

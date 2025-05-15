@@ -1,203 +1,183 @@
-/* Contenedor principal: fondo completo, estructura vertical */
+/* 1) Contenedor principal: centrado, más grande */
 .tp2-main-container {
-  height: 100vh;
-  position: relative;
+  width: 90vw;
+  max-width: 1200px;
+  height: 90vh;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin: auto;
+  position: relative;
 }
 
-/* Mensaje de Bienvenida en la parte superior */
-.tp2-welcome {
-  color: #fff;
-  font-size: 3em;
-  text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-  margin: 20px auto 0 auto;
-  flex: 1; /* Ocupa el espacio superior */
+/* 2) Área de la prueba */
+.tp2-test-area {
+    width: 800px;
+    height: 600px;
+    position: relative;
+    margin: 0 auto;
+    border: 1px solid #ccc;
+}
+
+/* 3) Estímulos (botones) */
+.tp2-stimulus {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  border-radius: 5px;
+  border: 1px solid #999;
+  font-size: 24px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
 }
+.tp2-stimulus.default {
+  background-color: #000;
+  color: #fff;
+}
+.tp2-stimulus.correct {
+  background-color: #b3e5b3;
+  color: #000;
+}
+.tp2-stimulus.error {
+  background-color: #f28b82;
+  color: #000;
+}
 
-/* Botón Ingresar en la parte inferior */
+/* 4) Etiquetas “inicio” / “fin” */
+.tp2-label {
+  position: absolute;
+  width: 70px;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* 5) Bienvenida e instrucciones */
+.tp2-welcome {
+  color: #000;
+  font-size: 3.5em;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+  margin: 20px auto 0;
+  flex: 1;
+}
+.tp2-instructions-container {
+  text-align: center;
+  margin-top: 50px;
+}
+.tp2-instructions-text {
+  color: #000;
+  font-size: 20px;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+  margin: 20px;
+}
+
+/* 6) Botón “Iniciar” */
 .tp2-ingresar-btn {
   background: linear-gradient(135deg, #ff9a9e, #fad0c4);
   color: #fff;
-  font-size: 20px;
+  font-size: 22px;
   border: none;
   border-radius: 30px;
-  padding: 12px 30px;
+  padding: 14px 34px;
   cursor: pointer;
   transition: all 0.3s ease;
   margin: 20px;
   align-self: center;
 }
-
 .tp2-ingresar-btn:hover {
   background: linear-gradient(135deg, #fad0c4, #ff9a9e);
   transform: scale(1.05);
 }
 
-/* Estilos para la tabla de resultados */
+/* 7) Resultados */
 .tp2-results-container {
   text-align: center;
   margin-top: 20px;
   color: #333;
 }
-
 .tp2-results-table {
   margin: 0 auto;
   border-collapse: collapse;
   width: 80%;
 }
-
 .tp2-results-table th,
 .tp2-results-table td {
   border: 1px solid #333;
   padding: 8px;
 }
 
-/* Estilos para la pantalla de instrucciones */
-.tp2-instructions-container {
-  text-align: center;
-  margin-top: 50px;
-}
-
-.tp2-instructions-text {
-  color: #fff;
-  font-size: 18px;
-  text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-  margin: 20px;
-}
-
-/* Opcionales: estilos para elementos de login y modal de cookies */
-/* Caja de login centrada */
-.tp2-login-box {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 10px;
-  padding: 30px;
-  width: 300px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-}
-
-/* Título del login */
-.tp2-login-box h2 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  font-size: 1.8em;
-  color: #333;
-}
-
-/* Estilos para el formulario */
-.tp2-form-group {
-  margin-bottom: 15px;
-  text-align: left;
-}
-
-.tp2-form-group label {
-  display: block;
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-.tp2-form-group input {
-  width: 100%;
-  padding: 8px;
-  font-size: 16px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  box-sizing: border-box;
-}
-
-/* Botón del formulario */
-.tp2-login-btn {
-  background: linear-gradient(135deg, #ff9a9e, #fad0c4);
-  color: #fff;
-  font-size: 18px;
-  border: none;
-  border-radius: 30px;
-  padding: 10px 20px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  width: 100%;
-  margin-top: 10px;
-}
-
-.tp2-login-btn:hover {
-  background: linear-gradient(135deg, #fad0c4, #ff9a9e);
-  transform: scale(1.05);
-}
-
-/* Overlay para el modal de cookies */
-.tp2-cookie-overlay {
+/* 8) Modal de comentario */
+/* Overlay semitransparente */
+.tp2-comment-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 9999;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.5);
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 1000;
 }
-
-/* Caja del modal de cookies */
-.tp2-cookie-modal {
-  background: rgba(255, 255, 255, 0.95);
+/* Caja blanca con toque femenino */
+.tp2-comment-modal {
+  background: #fff;
   border-radius: 10px;
-  padding: 30px 40px;
-  max-width: 600px;
+  padding: 24px;
   width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   text-align: center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
 }
-
-.tp2-cookie-modal h2 {
+/* Título */
+.tp2-comment-modal h2 {
   margin-top: 0;
-  margin-bottom: 15px;
-  font-size: 1.6em;
+  margin-bottom: 12px;
+  font-size: 1.8em;
   color: #333;
 }
-
-.tp2-cookie-modal p {
-  margin-bottom: 10px;
-  font-size: 1em;
-  line-height: 1.4;
+/* Área de texto */
+.tp2-comment-modal textarea {
+  width: 100%;
+  height: 120px;
+  padding: 10px;
+  font-size: 1rem;
+  margin-bottom: 16px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-sizing: border-box;
+  resize: vertical;
 }
-
-/* Lista con viñetas */
-.tp2-cookie-modal ul {
-  text-align: left;
-  margin-bottom: 10px;
-  padding-left: 20px;
-}
-
-/* Contenedor de botones del modal */
-.tp2-cookie-buttons {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
-  gap: 15px;
-}
-
-/* Botones estilo "flow femenino" */
-.tp2-cookie-buttons button {
+/* Botón con gradiente rosa “mono flow” */
+.tp2-comment-modal button {
   background: linear-gradient(135deg, #ff9a9e, #fad0c4);
   color: #fff;
-  font-size: 16px;
+  font-size: 18px;
   border: none;
   border-radius: 30px;
-  padding: 10px 20px;
+  padding: 12px 28px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
-
-.tp2-cookie-buttons button:hover {
+.tp2-comment-modal button:hover {
+  background: linear-gradient(135deg, #fad0c4, #ff9a9e);
+  transform: scale(1.05);
+}
+/* Botón “Atrás” */
+.tp2-back-btn {
+  background: linear-gradient(135deg, #ff9a9e, #fad0c4);
+  color: #fff;
+  font-size: 18px;
+  border: none;
+  border-radius: 30px;
+  padding: 12px 28px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 20px;
+}
+.tp2-back-btn:hover {
   background: linear-gradient(135deg, #fad0c4, #ff9a9e);
   transform: scale(1.05);
 }
