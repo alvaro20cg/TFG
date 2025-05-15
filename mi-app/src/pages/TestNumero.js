@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
 import './TestNumero.css';
-
 
 // Genera posiciones aleatorias sin superposición
 function generateNonOverlappingPositions(numStimuli, minDistance, containerWidth, containerHeight) {
@@ -47,37 +45,31 @@ const TestNumero = () => {
   const containerWidth = 750;
   const containerHeight = 550;
 
-  // Estados de la prueba
-  const [currentPart, setCurrentPart]       = useState(null); // 'A' | 'B' | 'finished'
-  const [sequence, setSequence]             = useState([]);
-  const [positions, setPositions]           = useState([]);
-  const [clicks, setClicks]                 = useState(0);
-  const [errors, setErrors]                 = useState(0);
-  const [startTime, setStartTime]           = useState(null);
+  const [currentPart, setCurrentPart] = useState(null); // 'A' | 'B' | 'finished'
+  const [sequence, setSequence] = useState([]);
+  const [positions, setPositions] = useState([]);
+  const [clicks, setClicks] = useState(0);
+  const [errors, setErrors] = useState(0);
+  const [startTime, setStartTime] = useState(null);
   const [buttonStatuses, setButtonStatuses] = useState([]);
-  const [results, setResults]               = useState([]);
+  const [results, setResults] = useState([]);
 
-  // Estado global de inicio para duración total
-  const [testStartTime, setTestStartTime]   = useState(null);
-
-  // Estados para el modal de comentario
+  const [testStartTime, setTestStartTime] = useState(null);
   const [showCommentModal, setShowCommentModal] = useState(false);
-  const [commentText, setCommentText]           = useState('');
+  const [commentText, setCommentText] = useState('');
   const [commentSubmitted, setCommentSubmitted] = useState(false);
 
   // Inicia la prueba (Parte A o B)
   const startTest = (part) => {
     if (part === 'A') {
       setTestStartTime(Date.now());
+      setResults([]);
     }
-    let seq = [];
-    if (part === 'A') {
-      seq = Array.from({ length: 25 }, (_, i) => (i + 1).toString());
-    } else {
-      const numbers = Array.from({ length: 13 }, (_, i) => (i + 1).toString());
-      const letters = 'ABCDEFGHIJKLM'.split('');
-      seq = numbers.flatMap((num, i) => [num, letters[i]]);
-    }
+    const seq = part === 'A'
+      ? Array.from({ length: 25 }, (_, i) => (i + 1).toString())
+      : Array.from({ length: 13 }, (_, i) => (i + 1).toString())
+          .flatMap((num, i) => [num, 'ABCDEFGHIJKLM'[i]]);
+
     setCurrentPart(part);
     setSequence(seq);
     setClicks(0);
@@ -89,26 +81,36 @@ const TestNumero = () => {
     ));
   };
 
-  // Guarda cada parte en trail_results
-  const savePartResult = async (part, time, errors) => {
+  // Guarda cada parte en trail_results con sus aciertos
+  const savePartResult = async (part, time, errors, correctCount) => {
     const { error } = await supabase
       .from('trail_results')
-      .insert([{ test_id: testId, part, time, errors, created_at: new Date() }]);
+      .insert([{ test_id: testId, part, time, errors, correct_count: correctCount, created_at: new Date() }]);
     if (error) console.error('Error guardando parte en Supabase:', error);
   };
 
-  // Guarda el resumen global en test_results
-  const saveTestResults = async () => {
-    const duration = parseFloat(((Date.now() - testStartTime) / 1000).toFixed(2));
-    const correctCount = results.reduce((sum, r) => sum + 1, 0);
-    const errorCount = results.reduce((sum, r) => sum + r.errors, 0);
+  // Guarda CSV en csv_logs
+  const saveCSVToSupabase = async (finalResults) => {
+    const csvHeader = 'part,correct,errors,time\n';
+    const csvBody = finalResults.map(r => `${r.part},${r.correctCount},${r.errors},${r.time}`).join('\n');
+    const { error } = await supabase
+      .from('csv_logs')
+      .insert([{ test_id: testId, csv_content: csvHeader + csvBody + '\n' }]);
+    if (error) console.error('Error guardando CSV en Supabase:', error);
+  };
+
+  // Guarda el resumen global en test_results sumando ambos tests
+  const saveTestResults = async (finalResults) => {
+    const duration = Math.round((Date.now() - testStartTime) / 1000);
+    const correctCount = finalResults.reduce((sum, r) => sum + r.correctCount, 0);
+    const errorCount   = finalResults.reduce((sum, r) => sum + r.errors, 0);
     const { error } = await supabase
       .from('test_results')
       .insert([{ test_id: testId, duration, correct_count: correctCount, error_count: errorCount, created_at: new Date() }]);
     if (error) console.error('Error guardando test_results en Supabase:', error);
   };
 
-  // Actualiza estado del test a "realizado"
+  // Marca el test como finalizado
   const markTestDone = async () => {
     const { error } = await supabase
       .from('test')
@@ -142,23 +144,26 @@ const TestNumero = () => {
     if (buttonStatuses[index] === 'correct') return;
 
     if (index === clicks) {
-      const updated = [...buttonStatuses];
-      updated[index] = 'correct';
-      setButtonStatuses(updated);
-      setClicks(c => c + 1);
+      const newClicks = clicks + 1;
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      const updatedStatuses = [...buttonStatuses];
+      updatedStatuses[index] = 'correct';
+      setButtonStatuses(updatedStatuses);
+      setClicks(newClicks);
 
-      if (clicks + 1 === sequence.length) {
-        const elapsed = parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
-        alert(`Parte ${currentPart} completada en ${elapsed} s con ${errors} errores`);
-
-        await savePartResult(currentPart, elapsed, errors);
-        setResults(r => [...r, { part: currentPart, time: elapsed, errors }]);
+      if (newClicks === sequence.length) {
+        const correctCount = updatedStatuses.filter(s => s === 'correct').length;
+        await savePartResult(currentPart, elapsed, errors, correctCount);
+        const updatedResults = [...results, { part: currentPart, time: elapsed, errors, correctCount }];
+        setResults(updatedResults);
 
         if (currentPart === 'A') {
           setTimeout(() => startTest('B'), 2000);
         } else {
+          await saveCSVToSupabase(updatedResults);
+          await saveTestResults(updatedResults);
+          await markTestDone();
           setCurrentPart('finished');
-          await saveTestResults();
           setShowCommentModal(true);
         }
       }
@@ -168,74 +173,82 @@ const TestNumero = () => {
       setButtonStatuses(updated);
       setErrors(e => e + 1);
       setTimeout(() => {
-        if (updated[index] === 'error') {
-          updated[index] = 'default';
-          setButtonStatuses([...updated]);
-        }
+        const reset = [...updated];
+        reset[index] = 'default';
+        setButtonStatuses(reset);
       }, 200);
     }
   };
 
-  // Renderers completos
+  // Área de test
   const renderTestArea = () => (
     <div className="tp2-test-area">
-      {sequence.map((item, i) => {
-        const pos = positions[i] || { x: 0, y: 0 };
-        return (
-          <button
-            key={i}
-            className={`tp2-stimulus ${buttonStatuses[i]}`}
-            onClick={() => handleButtonClick(i)}
-            disabled={buttonStatuses[i] === 'correct'}
-            style={{ left: pos.x, top: pos.y }}
-          >
-            {item}
-          </button>
-        );
-      })}
+      {sequence.map((item, i) => (
+        <button
+          key={i}
+          className={`tp2-stimulus ${buttonStatuses[i]}`}
+          onClick={() => handleButtonClick(i)}
+          disabled={buttonStatuses[i] === 'correct'}
+          style={{ left: positions[i]?.x, top: positions[i]?.y }}
+        >
+          {item}
+        </button>
+      ))}
       {sequence.length > 0 && positions[0] && (
         <div className="tp2-label" style={{ left: positions[0].x, top: positions[0].y - 20 }}>
           inicio
         </div>
       )}
       {sequence.length > 0 && positions[sequence.length - 1] && (
-        <div
-          className="tp2-label"
-          style={{
-            left: positions[sequence.length - 1].x,
-            top: positions[sequence.length - 1].y - 20
-          }}
-        >
+        <div className="tp2-label"
+             style={{ left: positions[sequence.length - 1].x, top: positions[sequence.length - 1].y - 20 }}>
           fin
         </div>
       )}
     </div>
   );
 
-  const renderResults = () => (
-    <div className="tp2-results-container">
-      <h2>Resultados Finales</h2>
-      <table className="tp2-results-table">
-        <thead>
-          <tr>
-            <th>Parte</th>
-            <th>Tiempo (s)</th>
-            <th>Errores</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((r, idx) => (
-            <tr key={idx}>
-              <td>{r.part}</td>
-              <td>{r.time}</td>
-              <td>{r.errors}</td>
+  // Resultados resumidos con sumatorio final
+  const renderResults = () => {
+    const totalCorrect = results.reduce((sum, r) => sum + r.correctCount, 0);
+    const totalErrors  = results.reduce((sum, r) => sum + r.errors, 0);
+    const totalTime    = results.reduce((sum, r) => sum + r.time, 0);
+    return (
+      <div className="tp2-results-container">
+        <h2>Resultados Finales</h2>
+        <table className="tp2-results-table">
+          <thead>
+            <tr>
+              <th>Parte</th>
+              <th>Aciertos</th>
+              <th>Errores</th>
+              <th>Tiempo (s)</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+          </thead>
+          <tbody>
+            {results.map((r, idx) => (
+              <tr key={idx}>
+                <td>{r.part}</td>
+                <td>{r.correctCount}</td>
+                <td>{r.errors}</td>
+                <td>{r.time}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>Total</td>
+              <td>{totalCorrect}</td>
+              <td>{totalErrors}</td>
+              <td>{totalTime}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    );
+  };
 
+  // Instrucciones
   const renderInstructions = () => (
     <div className="tp2-instructions-container">
       <div className="tp2-welcome">Trail Making Test</div>
@@ -252,12 +265,7 @@ const TestNumero = () => {
     <div className="tp2-main-container">
       {currentPart === null && renderInstructions()}
       {(currentPart === 'A' || currentPart === 'B') && renderTestArea()}
-      {currentPart === 'finished' && (
-        <>
-          {renderTestArea()}
-          {renderResults()}
-        </>
-      )}
+      {currentPart === 'finished' && renderResults()}
 
       {showCommentModal && (
         <div className="tp2-comment-overlay">

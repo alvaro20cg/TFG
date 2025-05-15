@@ -1,4 +1,3 @@
-// src/pages/ViewResults.jsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
@@ -55,7 +54,7 @@ const ViewResults = () => {
   const testOptions   = [...new Set(results.map(r => r.nombre))];
   const emailOptions  = [...new Set(results.map(r => r.users?.email).filter(Boolean))];
   const statusOptions = [...new Set(results.map(r => r.status))];
-  const dateOptions   = [...new Set(results.map(r => new Date(r.created_at).toISOString().slice(0,10)))];
+  const dateOptions   = [...new Set(results.map(r => new Date(r.created_at).toISOString().slice(0,10)))]
 
   const filteredResults = results.filter(row => {
     const rowDate = new Date(row.created_at).toISOString().slice(0,10);
@@ -77,10 +76,15 @@ const ViewResults = () => {
       alert('No hay datos para exportar CSV.');
       return;
     }
-    const safeTest  = row.nombre.replace(/\s+/g, '_');
-    const safeFirst = row.users?.first_name.replace(/\s+/g, '_')  || '';
-    const safeLast  = row.users?.last_name.replace(/\s+/g, '_')   || '';
-    const filename  = `${row.id}_${safeTest}_${safeFirst}_${safeLast}.csv`;
+
+    // Construir partes seguras del nombre de archivo, eliminando espacios extra
+    const safeTest  = row.nombre.trim().split(/\s+/).join('_');
+    const safeFirst = row.users?.first_name?.trim().split(/\s+/).join('_') || '';
+    const safeLast  = row.users?.last_name?.trim().split(/\s+/).join('_') || '';
+
+    // Solo incluir las partes no vacías
+    const parts = [row.id, safeTest, safeFirst, safeLast].filter(p => p);
+    const filename = parts.join('_') + '.csv';
 
     const headers = ['duration','correct_count','error_count','comment'];
     const rows = [[
@@ -211,7 +215,7 @@ const ViewResults = () => {
             );
           }) : (
             <tr>
-              <td colSpan="10">No hay tests que coincidan con los filtros.</td>
+              <td colSpan="10">No hay tests que coincidan con los filtros。</td>
             </tr>
           )}
         </tbody>
@@ -224,7 +228,7 @@ const ViewResults = () => {
       {showDeleteModal && (
         <div className="delete-modal-overlay" onClick={cancelDelete}>
           <div className="delete-modal" onClick={e => e.stopPropagation()}>
-            <p>¿Estás seguro que quieres eliminar el test?</p>
+            <p>¿Estás seguro que quieres eliminar el test？</p>
             <div className="modal-buttons">
               <button onClick={cancelDelete}>Cancelar</button>
               <button className="delete-btn" onClick={confirmDeleteTest}>Eliminar</button>

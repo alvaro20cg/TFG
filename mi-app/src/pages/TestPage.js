@@ -60,50 +60,46 @@ const TestPage = () => {
     return found || originalImages.find(img => img.folder === targetFolder);
   }, [originalImages, targetFolder, state.selectedEmotion]);
 
-  const generateNonOverlappingPositions = (numImages) => {
+  const generateNonOverlappingPositions = numImages => {
     const pos = [];
     const maxAttempts = 1000;
-    const imageWidthPercent = 10;
-    const imageHeightPercent = 25;
-    const containerWidth = 100;
-    const containerHeight = 80;
+    const imageW = 10;
+    const imageH = 25;
+    const containerW = 100;
+    const containerH = 80;
     for (let i = 0; i < numImages; i++) {
       let attempt = 0;
       let position;
-      let overlapping = true;
-      while (overlapping && attempt < maxAttempts) {
-        const top = Math.random() * (containerHeight - imageHeightPercent);
-        const left = Math.random() * (containerWidth - imageWidthPercent);
-        position = { top, left, width: imageWidthPercent, height: imageHeightPercent };
-        overlapping = pos.some(p => {
-          return !(
-            (left + imageWidthPercent <= parseFloat(p.left)) ||
-            (left >= parseFloat(p.left) + parseFloat(p.width)) ||
-            (top + imageHeightPercent <= parseFloat(p.top)) ||
-            (top >= parseFloat(p.top) + parseFloat(p.height))
-          );
-        });
+      let overlap;
+      do {
+        const top = Math.random() * (containerH - imageH);
+        const left = Math.random() * (containerW - imageW);
+        position = { top, left, width: imageW, height: imageH };
+        overlap = pos.some(p => !(
+          left + imageW <= p.left ||
+          left >= p.left + p.width ||
+          top + imageH <= p.top ||
+          top >= p.top + p.height
+        ));
         attempt++;
-      }
+      } while (overlap && attempt < maxAttempts);
       pos.push({
         top: `${position.top}%`,
         left: `${position.left}%`,
-        width: `${imageWidthPercent}%`,
-        height: `${imageHeightPercent}%`
+        width: `${position.width}%`,
+        height: `${position.height}%`
       });
     }
     return pos;
   };
 
-  const displayImages = originalImages;
-
   // Genera posiciones cuando termina el preview
   useEffect(() => {
     if (!showPreview) {
-      setPositions(generateNonOverlappingPositions(displayImages.length));
+      setPositions(generateNonOverlappingPositions(originalImages.length));
       setRoundStartTime(Date.now());
     }
-  }, [currentRoundIndex, displayImages.length, showPreview]);
+  }, [currentRoundIndex, originalImages.length, showPreview]);
 
   // Contador de 5 segundos para la vista previa
   useEffect(() => {
@@ -132,21 +128,15 @@ const TestPage = () => {
       minOpacity: 0.1,
       blur: 0.9
     });
-    const points = eyeTrackingData.map(data => ({
-      x: data.x,
-      y: data.y,
-      value: 1
-    }));
+    const points = eyeTrackingData.map(d => ({ x: d.x, y: d.y, value: 1 }));
     heatmapInstance.setData({ max: 1, data: points });
   };
 
   useEffect(() => {
-    if (eyeTrackingData.length > 0) {
-      generateHeatmap();
-    }
+    if (eyeTrackingData.length > 0) generateHeatmap();
   }, [eyeTrackingData]);
 
-  const saveCSVToSupabase = async (csvContent) => {
+  const saveCSVToSupabase = async csvContent => {
     if (!testId) return;
     const { error } = await supabase
       .from('csv_logs')
@@ -154,34 +144,39 @@ const TestPage = () => {
     if (error) console.error("Error al guardar CSV:", error);
   };
 
-  const saveTestResults = async (duration, correctCount, errorCount) => {
+  const saveTestResults = async (durationSec, correctCount, errorCount) => {
     const { error } = await supabase
       .from('test_results')
-      .insert([{ test_id: testId, duration, correct_count: correctCount, error_count: errorCount }]);
+      .insert([{ test_id: testId, duration: durationSec, correct_count: correctCount, error_count: errorCount }]);
     if (error) console.error("Error al guardar resultados:", error);
   };
 
-  const finalizeTest = async (finalResults) => {
+  const finalizeTest = async finalResults => {
     const csvContent = finalResults.reduce(
       (acc, curr) => acc + `${curr.round},${curr.reactionTime},${curr.result}\n`,
       "round,reactionTime,result\n"
     );
     await saveCSVToSupabase(csvContent);
-    const duration = Date.now() - testStartTime;
+
+    // Duración total en segundos
+    const durationSec = Math.round((Date.now() - testStartTime) / 1000);
     const correctCount = finalResults.filter(r => r.result === "acertado").length;
     const errorCount = finalResults.filter(r => r.result === "fallado").length;
-    await saveTestResults(duration, correctCount, errorCount);
+    await saveTestResults(durationSec, correctCount, errorCount);
+
     const { error } = await supabase
       .from('test')
       .update({ status: 'finalizado' })
       .match({ id: testId });
     if (error) console.error("Error al actualizar test:", error);
+
     navigate('/userresults');
   };
 
-  const handleImageClick = (img) => {
+  const handleImageClick = img => {
     if (showPreview) return;
-    const reactionTime = Date.now() - roundStartTime;
+    // Tiempo de reacción en segundos
+    const reactionTime = Math.round((Date.now() - roundStartTime) / 1000);
     const isCorrect = img.id === targetImage.id;
     const resultStr = isCorrect ? "acertado" : "fallado";
     const newResult = { round: currentRoundIndex + 1, reactionTime, result: resultStr };
@@ -216,10 +211,10 @@ const TestPage = () => {
         <div className="images-container" style={{ position: 'relative' }}>
           <div className="heatmap-container"
                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
-          {displayImages.map((img, index) => (
+          {originalImages.map((img, idx) => (
             <div
               key={img.id}
-              style={{ position: 'absolute', cursor: 'pointer', ...positions[index] }}
+              style={{ position: 'absolute', cursor: 'pointer', ...positions[idx] }}
               onClick={() => handleImageClick(img)}
             >
               <img
