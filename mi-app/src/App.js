@@ -11,7 +11,7 @@ import ViewResults from './pages/ViewResults';
 import TestPage from './pages/TestPage';
 import ResetPassword from './pages/ResetPassword';
 import ConfigurarLetras from './pages/ConfigurarLetras';
-import TestPage2 from './pages/TestPage2';
+import TestNumero from './pages/TestNumero';
 import './App.css';
 
 function App() {
@@ -26,7 +26,7 @@ function App() {
         <Route path="/view-patients" element={<ViewPatients />} />
         <Route path="/view-results" element={<ViewResults />} />
         <Route path="/testpage" element={<TestPage />} />
-        <Route path="/testpage2" element={<TestPage2 />} />
+        <Route path="/TestNumero" element={<TestNumero />} />
         <Route path="/configurar-letras" element={<ConfigurarLetras />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" />} />

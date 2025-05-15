@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
-import './testPage2.css';
+import './TestNumero.css';
 
 
 // Genera posiciones aleatorias sin superposición
@@ -35,7 +35,7 @@ function generateNonOverlappingPositions(numStimuli, minDistance, containerWidth
   return positions;
 }
 
-const TestPage2 = () => {
+const TestNumero = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
   const testId = state?.testId;
@@ -282,4 +282,4 @@ const TestPage2 = () => {
   );
 };
 
-export default TestPage2;
+export default TestNumero;

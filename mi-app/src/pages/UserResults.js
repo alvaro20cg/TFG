@@ -59,7 +59,7 @@ const UserPanel = () => {
   const handleTestClick = (test) => {
     const navState = { state: { ...test.configuration, testId: test.id } };
     if (test.test_type === 'letras') {
-      navigate('/testpage2', navState);
+      navigate('/TestNumero', navState);
     } else {
       // para caras u otros tipos
       navigate('/testpage', navState);
