@@ -1,7 +1,9 @@
 // src/pages/MainPage.js
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import supabase from '../config/supabase';
+import cosasImg from '../assets/images/cosas.png';
 import './MainPage.css';
 
 const MainPage = () => {
@@ -31,6 +33,7 @@ const MainPage = () => {
   };
 
   const handleIngresar = () => setShowLogin(true);
+  const handleCloseLogin = () => setShowLogin(false);
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -89,6 +92,14 @@ const MainPage = () => {
   return (
     <div className="main-container">
       {!showLogin && (
+        <img
+          src={cosasImg}
+          alt="Cosas"
+          className="cosas-photo"
+        />
+      )}
+
+      {!showLogin && (
         <>
           <h1 className="welcome">Bienvenido a Nuestra Aplicación</h1>
           <div className="side-buttons">
@@ -110,6 +121,7 @@ const MainPage = () => {
 
       {showLogin && (
         <div className="login-box">
+          <button className="close-btn" onClick={handleCloseLogin}>×</button>
           <h2>Iniciar Sesión</h2>
           <form onSubmit={handleLoginSubmit}>
             <div className="form-group">
@@ -193,7 +205,7 @@ const MainPage = () => {
         </div>
       )}
 
-      {/* Modales comic */}
+      {/* Modales “cómic” */}
       {showAbout && (
         <div className="modal-overlay" onClick={() => setShowAbout(false)}>
           <div className="comic-modal" onClick={e => e.stopPropagation()}>
