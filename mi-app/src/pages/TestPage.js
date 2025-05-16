@@ -1,38 +1,68 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
 import './TestPage.css';
-import heatmap from 'heatmap.js'; // Importa la librería heatmap.js
+import * as tf from '@tensorflow/tfjs-core';
+import '@tensorflow/tfjs-backend-webgl';
+import { createDetector, SupportedModels } from '@tensorflow-models/face-landmarks-detection';
+import heatmap from 'heatmap.js';
 
 const emotionMapping = {
-  "Alegría": "h",
-  "Tristeza": "s",
-  "Enfado": "f",
-  "Asco": "d",
-  "Enojo": "a",
-  "Neutral": "n"
+  Alegría: 'h',
+  Tristeza: 's',
+  Enfado: 'f',
+  Asco: 'd',
+  Enojo: 'a',
+  Neutral: 'n'
 };
 
 const TestPage = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const videoRef = useRef(null);
+  const modelRef = useRef(null);
 
   useEffect(() => {
     if (!state || !state.testId) {
       navigate('/');
+      return;
     }
+
+    async function setupCameraAndModel() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const video = videoRef.current;
+        video.srcObject = stream;
+        await new Promise(resolve => { video.onloadedmetadata = resolve; });
+        await video.play();
+
+        await tf.setBackend('webgl');
+        await tf.ready();
+
+        modelRef.current = await createDetector(
+          SupportedModels.MediaPipeFaceMesh,
+          { runtime: 'tfjs', maxFaces: 1 }
+        );
+        console.log('Modelo FaceMesh cargado');
+
+        requestAnimationFrame(detectLoop);
+      } catch (err) {
+        console.error('Error setup camera/model:', err);
+      }
+    }
+
+    setupCameraAndModel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, navigate]);
 
   const testId = state?.testId;
-  const selectedVersion = state?.selectedVersion || "a";
-
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [roundStartTime, setRoundStartTime] = useState(Date.now());
-  const [testStartTime, setTestStartTime] = useState(Date.now());
+  const [testStartTime] = useState(Date.now());
   const [positions, setPositions] = useState([]);
   const [results, setResults] = useState([]);
   const [showPreview, setShowPreview] = useState(true);
-  const [countdown, setCountdown] = useState(5);
+  const [countdown, setCountdown] = useState(10);
   const [eyeTrackingData, setEyeTrackingData] = useState([]);
 
   const rounds = state?.rounds || [];
@@ -42,154 +72,143 @@ const TestPage = () => {
   const targetFolder = currentRoundData.targetFolder;
 
   useEffect(() => {
-    // Pre-carga de imágenes
-    originalImages.forEach(imgData => {
-      const img = new Image();
-      img.src = imgData.url;
-    });
+    originalImages.forEach(img => new Image().src = img.url);
   }, [originalImages]);
 
   const targetImage = useMemo(() => {
-    const targetLetter = emotionMapping[state.selectedEmotion];
-    const found = originalImages.find(img => {
-      if (img.folder !== targetFolder) return false;
-      if (!img.file) return false;
-      const parts = img.file.split('_');
-      return parts[3] === targetLetter;
-    });
-    return found || originalImages.find(img => img.folder === targetFolder);
+    const letter = emotionMapping[state.selectedEmotion];
+    return originalImages.find(img => img.folder === targetFolder && img.file?.split('_')[3] === letter)
+      || originalImages.find(img => img.folder === targetFolder);
   }, [originalImages, targetFolder, state.selectedEmotion]);
 
-  const generateNonOverlappingPositions = numImages => {
+  const generatePositions = num => {
     const pos = [];
-    const maxAttempts = 1000;
-    const imageW = 10;
-    const imageH = 25;
-    const containerW = 100;
-    const containerH = 80;
-    for (let i = 0; i < numImages; i++) {
+    for (let i = 0; i < num; i++) {
       let attempt = 0;
-      let position;
-      let overlap;
+      let p;
       do {
-        const top = Math.random() * (containerH - imageH);
-        const left = Math.random() * (containerW - imageW);
-        position = { top, left, width: imageW, height: imageH };
-        overlap = pos.some(p => !(
-          left + imageW <= p.left ||
-          left >= p.left + p.width ||
-          top + imageH <= p.top ||
-          top >= p.top + p.height
-        ));
+        const top = Math.random() * 75;
+        const left = Math.random() * 90;
+        p = { top: `${top}%`, left: `${left}%`, width: '10%', height: '25%' };
         attempt++;
-      } while (overlap && attempt < maxAttempts);
-      pos.push({
-        top: `${position.top}%`,
-        left: `${position.left}%`,
-        width: `${position.width}%`,
-        height: `${position.height}%`
-      });
+      } while (
+        pos.some(o => (
+          !(parseFloat(p.left) + 10 <= parseFloat(o.left) ||
+            parseFloat(p.left) >= parseFloat(o.left) + 10 ||
+            parseFloat(p.top) + 25 <= parseFloat(o.top) ||
+            parseFloat(p.top) >= parseFloat(o.top) + 25)
+        )) && attempt < 500
+      );
+      pos.push(p);
     }
     return pos;
   };
 
-  // Genera posiciones cuando termina el preview
   useEffect(() => {
     if (!showPreview) {
-      setPositions(generateNonOverlappingPositions(originalImages.length));
+      setPositions(generatePositions(originalImages.length));
       setRoundStartTime(Date.now());
+      console.log('Iniciando ronda', currentRoundIndex + 1);
     }
-  }, [currentRoundIndex, originalImages.length, showPreview]);
+  }, [showPreview, currentRoundIndex, originalImages.length]);
 
-  // Contador de 5 segundos para la vista previa
   useEffect(() => {
-    let timer;
-    if (showPreview) {
-      setCountdown(5);
-      timer = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            setShowPreview(false);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+    if (!showPreview) return;
+    setCountdown(10);
+    const timer = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) {
+          clearInterval(timer);
+          setShowPreview(false);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
     return () => clearInterval(timer);
-  }, [currentRoundIndex, showPreview]);
+  }, [currentRoundIndex, showPreview, originalImages.length]);
 
-  const generateHeatmap = () => {
-    const heatmapInstance = heatmap.create({
-      container: document.querySelector('.heatmap-container'),
-      radius: 50,
-      maxOpacity: 0.6,
-      minOpacity: 0.1,
-      blur: 0.9
-    });
-    const points = eyeTrackingData.map(d => ({ x: d.x, y: d.y, value: 1 }));
-    heatmapInstance.setData({ max: 1, data: points });
+  const detectLoop = async () => {
+    const video = videoRef.current;
+    if (!video) {
+      return requestAnimationFrame(detectLoop);
+    }
+    try {
+      if (
+        modelRef.current &&
+        video.readyState === HTMLMediaElement.HAVE_ENOUGH_DATA &&
+        !showPreview
+      ) {
+        const faces = await modelRef.current.estimateFaces({
+          input: video,
+          returnTensors: false,
+          flipHorizontal: false,
+          predictIrises: true
+        });
+        if (faces.length) {
+          const iris = faces[0].annotations.leftEyeIris;
+          const cx = (iris[0][0] + iris[1][0] + iris[2][0] + iris[3][0]) / 4;
+          const cy = (iris[0][1] + iris[1][1] + iris[2][1] + iris[3][1]) / 4;
+          const cont = document.querySelector('.images-container').getBoundingClientRect();
+          const x = cx - cont.left;
+          const y = cy - cont.top;
+          console.log('Iris en:', x, y);
+          setEyeTrackingData(prev => [...prev, { x, y }]);
+        }
+      }
+    } catch (e) {
+      console.error('DetectLoop error:', e);
+    }
+    requestAnimationFrame(detectLoop);
   };
 
   useEffect(() => {
-    if (eyeTrackingData.length > 0) generateHeatmap();
-  }, [eyeTrackingData]);
+    if (showPreview || !eyeTrackingData.length) return;
+    console.log('Heatmap con puntos:', eyeTrackingData.length);
+    const container = document.querySelector('.heatmap-container');
+    container.innerHTML = '';
+    const hm = heatmap.create({ container, radius: 50, maxOpacity: 0.6, minOpacity: 0.1, blur: 0.9 });
+    hm.setData({ max: 1, data: eyeTrackingData.map(p => ({ x: p.x, y: p.y, value: 1 })) });
+  }, [eyeTrackingData, showPreview]);
 
-  const saveCSVToSupabase = async csvContent => {
-    if (!testId) return;
-    const { error } = await supabase
-      .from('csv_logs')
-      .insert([{ test_id: testId, csv_content: csvContent }]);
-    if (error) console.error("Error al guardar CSV:", error);
-  };
+  const saveCSV = async csv => { if (!testId) return; await supabase.from('csv_logs').insert([{ test_id: testId, csv_content: csv }]); };
+  const saveResults = async (dur, corr, err) => await supabase.from('test_results').insert([{ test_id: testId, duration: dur, correct_count: corr, error_count: err }]);
 
-  const saveTestResults = async (durationSec, correctCount, errorCount) => {
-    const { error } = await supabase
-      .from('test_results')
-      .insert([{ test_id: testId, duration: durationSec, correct_count: correctCount, error_count: errorCount }]);
-    if (error) console.error("Error al guardar resultados:", error);
-  };
-
-  const finalizeTest = async finalResults => {
-    const csvContent = finalResults.reduce(
-      (acc, curr) => acc + `${curr.round},${curr.reactionTime},${curr.result}\n`,
-      "round,reactionTime,result\n"
-    );
-    await saveCSVToSupabase(csvContent);
-
-    // Duración total en segundos
-    const durationSec = Math.round((Date.now() - testStartTime) / 1000);
-    const correctCount = finalResults.filter(r => r.result === "acertado").length;
-    const errorCount = finalResults.filter(r => r.result === "fallado").length;
-    await saveTestResults(durationSec, correctCount, errorCount);
-
-    const { error } = await supabase
-      .from('test')
-      .update({ status: 'finalizado' })
-      .match({ id: testId });
-    if (error) console.error("Error al actualizar test:", error);
-
+  const finalizeTest = async fr => {
+    console.log('Finalizando test', fr);
+    const csv = fr.reduce((a, c) => a + `${c.round},${c.reactionTime},${c.result}\n`, 'round,reactionTime,result\n');
+    await saveCSV(csv);
+    const dur = Math.round((Date.now() - testStartTime) / 1000);
+    const corr = fr.filter(r => r.result === 'acertado').length;
+    const err = fr.filter(r => r.result === 'fallado').length;
+    await saveResults(dur, corr, err);
+    const canvas = document.querySelector('.heatmap-container canvas');
+    if (canvas) {
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL();
+      link.download = `heatmap_test_${testId}.png`;
+      link.click();
+      console.log('Heatmap descargado');
+    }
+    await supabase.from('test').update({ status: 'finalizado' }).match({ id: testId });
     navigate('/userresults');
   };
 
   const handleImageClick = img => {
     if (showPreview) return;
-    // Tiempo de reacción en segundos
-    const reactionTime = Math.round((Date.now() - roundStartTime) / 1000);
-    const isCorrect = img.id === targetImage.id;
-    const resultStr = isCorrect ? "acertado" : "fallado";
-    const newResult = { round: currentRoundIndex + 1, reactionTime, result: resultStr };
-    const updatedResults = [...results, newResult];
-
+    const rt = Math.round((Date.now() - roundStartTime) / 1000);
+    const res = img.id === targetImage.id ? 'acertado' : 'fallado';
+    console.log(`Ronda ${currentRoundIndex + 1}: img ${img.id}, ${res}, ${rt}s`);
+    const newRes = { round: currentRoundIndex + 1, reactionTime: rt, result: res };
+    const updated = [...results, newRes];
+    setResults(updated);
     if (currentRoundIndex < totalRounds - 1) {
-      setResults(updatedResults);
-      setCurrentRoundIndex(currentRoundIndex + 1);
+      setCurrentRoundIndex(i => i + 1);
       setShowPreview(true);
+      setEyeTrackingData([]);
     } else {
-      setResults(updatedResults);
-      alert("Test finalizado");
-      finalizeTest(updatedResults);
+      console.log('Última ronda completada');
+      finalizeTest(updated);
     }
   };
 
@@ -200,33 +219,24 @@ const TestPage = () => {
         <div className="target-info">Busca: {targetFolder}</div>
         <button className="cancel-btn" onClick={() => navigate('/userresults')}>Cancelar Test</button>
       </div>
-
       {showPreview && targetImage ? (
         <div className="preview-container">
-          <img className="preview-image" src={targetImage.url} alt={`Target ${targetImage.id}`} />
+          <img className="preview-image" src={targetImage.url} alt="Target" />
           <p className="preview-text">Observa la imagen target</p>
           <p className="countdown">Comienza en {countdown}...</p>
         </div>
       ) : (
-        <div className="images-container" style={{ position: 'relative' }}>
-          <div className="heatmap-container"
-               style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+        <div className="images-container">
+          <div className="heatmap-container"></div>
           {originalImages.map((img, idx) => (
-            <div
-              key={img.id}
-              style={{ position: 'absolute', cursor: 'pointer', ...positions[idx] }}
-              onClick={() => handleImageClick(img)}
-            >
-              <img
-                src={img.url}
-                alt={`Imagen ${img.id}`}
-                style={{ width: '100%', height: '80%', objectFit: 'cover' }}
-              />
+            <div key={img.id} style={{ position: 'absolute', cursor: 'pointer', ...positions[idx] }} onClick={() => handleImageClick(img)}>
+              <img src={img.url} alt="" style={{ width: '100%', height: '80%', objectFit: 'cover' }} />
               <p style={{ margin: 0, fontSize: '0.7rem', textAlign: 'center' }}>{img.file}</p>
             </div>
           ))}
         </div>
       )}
+      <video ref={videoRef} style={{ display: 'none' }} playsInline muted width="640" height="480" />
     </div>
   );
 };
