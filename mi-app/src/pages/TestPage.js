@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+// src/components/TestPage.js
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
 import './TestPage.css';
-import heatmap from 'heatmap.js'; // Importa la librería heatmap.js
+import heatmap from 'heatmap.js';
 
 const emotionMapping = {
   "Alegría": "h",
@@ -16,6 +17,7 @@ const emotionMapping = {
 const TestPage = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const containerRef = useRef(null);
 
   useEffect(() => {
     if (!state || !state.testId) {
@@ -24,16 +26,19 @@ const TestPage = () => {
   }, [state, navigate]);
 
   const testId = state?.testId;
-  const selectedVersion = state?.selectedVersion || "a";
-
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [roundStartTime, setRoundStartTime] = useState(Date.now());
-  const [testStartTime, setTestStartTime] = useState(Date.now());
+  const [testStartTime] = useState(Date.now());
   const [positions, setPositions] = useState([]);
   const [results, setResults] = useState([]);
   const [showPreview, setShowPreview] = useState(true);
   const [countdown, setCountdown] = useState(5);
   const [eyeTrackingData, setEyeTrackingData] = useState([]);
+
+  // Nuevos estados para el modal de feedback
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentSubmitted, setCommentSubmitted] = useState(false);
 
   const rounds = state?.rounds || [];
   const totalRounds = rounds.length;
@@ -42,7 +47,6 @@ const TestPage = () => {
   const targetFolder = currentRoundData.targetFolder;
 
   useEffect(() => {
-    // Pre-carga de imágenes
     originalImages.forEach(imgData => {
       const img = new Image();
       img.src = imgData.url;
@@ -60,48 +64,43 @@ const TestPage = () => {
     return found || originalImages.find(img => img.folder === targetFolder);
   }, [originalImages, targetFolder, state.selectedEmotion]);
 
-  const generateNonOverlappingPositions = numImages => {
+  const generateNonOverlappingPositions = () => {
+    const container = containerRef.current;
+    if (!container) return [];
+    const { width: cw, height: ch } = container.getBoundingClientRect();
+    const wPct = 10, hPct = 25;
+    const wPx = (wPct/100)*cw, hPx = (hPct/100)*ch;
     const pos = [];
-    const maxAttempts = 1000;
-    const imageW = 10;
-    const imageH = 25;
-    const containerW = 100;
-    const containerH = 80;
-    for (let i = 0; i < numImages; i++) {
-      let attempt = 0;
-      let position;
-      let overlap;
+    for (let i = 0; i < originalImages.length; i++) {
+      let attempt = 0, topPx, leftPx, overlap;
       do {
-        const top = Math.random() * (containerH - imageH);
-        const left = Math.random() * (containerW - imageW);
-        position = { top, left, width: imageW, height: imageH };
-        overlap = pos.some(p => !(
-          left + imageW <= p.left ||
-          left >= p.left + p.width ||
-          top + imageH <= p.top ||
-          top >= p.top + p.height
-        ));
+        topPx = Math.random()*(ch - hPx);
+        leftPx = Math.random()*(cw - wPx);
+        overlap = pos.some(p =>
+          !(leftPx + wPx <= p.leftPx ||
+            leftPx >= p.leftPx + p.widthPx ||
+            topPx + hPx <= p.topPx ||
+            topPx >= p.topPx + p.heightPx)
+        );
         attempt++;
-      } while (overlap && attempt < maxAttempts);
-      pos.push({
-        top: `${position.top}%`,
-        left: `${position.left}%`,
-        width: `${position.width}%`,
-        height: `${position.height}%`
-      });
+      } while (overlap && attempt < 1000);
+      pos.push({ topPx, leftPx, widthPx: wPx, heightPx: hPx });
     }
-    return pos;
+    return pos.map(p => ({
+      top: `${(p.topPx/ch)*100}%`,
+      left: `${(p.leftPx/cw)*100}%`,
+      width: `${wPct}%`,
+      height: `${hPct}%`
+    }));
   };
 
-  // Genera posiciones cuando termina el preview
   useEffect(() => {
     if (!showPreview) {
-      setPositions(generateNonOverlappingPositions(originalImages.length));
+      setPositions(generateNonOverlappingPositions());
       setRoundStartTime(Date.now());
     }
-  }, [currentRoundIndex, originalImages.length, showPreview]);
+  }, [currentRoundIndex, showPreview]);
 
-  // Contador de 5 segundos para la vista previa
   useEffect(() => {
     let timer;
     if (showPreview) {
@@ -121,75 +120,83 @@ const TestPage = () => {
   }, [currentRoundIndex, showPreview]);
 
   const generateHeatmap = () => {
-    const heatmapInstance = heatmap.create({
-      container: document.querySelector('.heatmap-container'),
-      radius: 50,
-      maxOpacity: 0.6,
-      minOpacity: 0.1,
-      blur: 0.9
+    const instance = heatmap.create({
+      container: containerRef.current.querySelector('.heatmap-container'),
+      radius: 50, maxOpacity: 0.6, minOpacity: 0.1, blur: 0.9
     });
     const points = eyeTrackingData.map(d => ({ x: d.x, y: d.y, value: 1 }));
-    heatmapInstance.setData({ max: 1, data: points });
+    instance.setData({ max:1, data: points });
   };
 
   useEffect(() => {
-    if (eyeTrackingData.length > 0) generateHeatmap();
+    if (eyeTrackingData.length) generateHeatmap();
   }, [eyeTrackingData]);
 
-  const saveCSVToSupabase = async csvContent => {
+  const saveCSV = async csvContent => {
     if (!testId) return;
-    const { error } = await supabase
-      .from('csv_logs')
-      .insert([{ test_id: testId, csv_content: csvContent }]);
-    if (error) console.error("Error al guardar CSV:", error);
+    await supabase.from('csv_logs').insert([{ test_id: testId, csv_content: csvContent }]);
   };
 
-  const saveTestResults = async (durationSec, correctCount, errorCount) => {
-    const { error } = await supabase
-      .from('test_results')
+  const saveResults = async (durationSec, correctCount, errorCount) => {
+    if (!testId) return;
+    await supabase.from('test_results')
       .insert([{ test_id: testId, duration: durationSec, correct_count: correctCount, error_count: errorCount }]);
-    if (error) console.error("Error al guardar resultados:", error);
   };
 
-  const finalizeTest = async finalResults => {
-    const csvContent = finalResults.reduce(
-      (acc, curr) => acc + `${curr.round},${curr.reactionTime},${curr.result}\n`,
+  const markTestDone = async () => {
+    if (!testId) return;
+    await supabase.from('test').update({ status: 'finalizado' }).match({ id: testId });
+  };
+
+  const finalizeTest = async () => {
+    const csv = results.reduce(
+      (acc, r) => acc + `${r.round},${r.reactionTime},${r.result}\n`,
       "round,reactionTime,result\n"
     );
-    await saveCSVToSupabase(csvContent);
+    await saveCSV(csv);
+    const durationSec = Math.round((Date.now() - testStartTime)/1000);
+    const correct = results.filter(r => r.result === 'acertado').length;
+    const errors = results.filter(r => r.result === 'fallado').length;
+    await saveResults(durationSec, correct, errors);
+    // Nota: no navegamos aquí; espera a comentario
+  };
 
-    // Duración total en segundos
-    const durationSec = Math.round((Date.now() - testStartTime) / 1000);
-    const correctCount = finalResults.filter(r => r.result === "acertado").length;
-    const errorCount = finalResults.filter(r => r.result === "fallado").length;
-    await saveTestResults(durationSec, correctCount, errorCount);
-
+  // Guarda el comentario en trail_comments
+  const saveComment = async () => {
+    if (!commentText.trim()) {
+      alert('El comentario no puede estar vacío.');
+      return;
+    }
     const { error } = await supabase
-      .from('test')
-      .update({ status: 'finalizado' })
-      .match({ id: testId });
-    if (error) console.error("Error al actualizar test:", error);
-
+      .from('trail_comments')
+      .insert([{ test_id: testId, part: 'general', comment: commentText }]);
+    if (error) {
+      console.error('Error guardando comentario:', error);
+      alert('Hubo un error guardando tu comentario.');
+      return;
+    }
+    // Guardar CSV y resultados antes de marcar como hecho
+    await finalizeTest();
+    await markTestDone();
+    setShowCommentModal(false);
+    setCommentSubmitted(true);
+    alert('¡Gracias por tu feedback!');
     navigate('/userresults');
   };
 
   const handleImageClick = img => {
     if (showPreview) return;
-    // Tiempo de reacción en segundos
-    const reactionTime = Math.round((Date.now() - roundStartTime) / 1000);
+    const reactionTime = Math.round((Date.now() - roundStartTime)/1000);
     const isCorrect = img.id === targetImage.id;
-    const resultStr = isCorrect ? "acertado" : "fallado";
-    const newResult = { round: currentRoundIndex + 1, reactionTime, result: resultStr };
-    const updatedResults = [...results, newResult];
+    const result = isCorrect ? 'acertado' : 'fallado';
+    const next = { round: currentRoundIndex+1, reactionTime, result };
+    setResults(prev => [...prev, next]);
 
     if (currentRoundIndex < totalRounds - 1) {
-      setResults(updatedResults);
-      setCurrentRoundIndex(currentRoundIndex + 1);
+      setCurrentRoundIndex(prev => prev + 1);
       setShowPreview(true);
     } else {
-      setResults(updatedResults);
-      alert("Test finalizado");
-      finalizeTest(updatedResults);
+      setShowCommentModal(true);
     }
   };
 
@@ -208,23 +215,33 @@ const TestPage = () => {
           <p className="countdown">Comienza en {countdown}...</p>
         </div>
       ) : (
-        <div className="images-container" style={{ position: 'relative' }}>
-          <div className="heatmap-container"
-               style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+        <div className="images-container" ref={containerRef}>
+          <div className="heatmap-container"></div>
           {originalImages.map((img, idx) => (
             <div
               key={img.id}
-              style={{ position: 'absolute', cursor: 'pointer', ...positions[idx] }}
+              className="image-wrapper"
+              style={positions[idx]}
               onClick={() => handleImageClick(img)}
             >
-              <img
-                src={img.url}
-                alt={`Imagen ${img.id}`}
-                style={{ width: '100%', height: '80%', objectFit: 'cover' }}
-              />
-              <p style={{ margin: 0, fontSize: '0.7rem', textAlign: 'center' }}>{img.file}</p>
+              <img src={img.url} alt={`Imagen ${img.id}`} />
+              <p>{img.file}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {showCommentModal && !commentSubmitted && (
+        <div className="tp2-comment-overlay">
+          <div className="tp2-comment-modal">
+            <h2>Comentario</h2>
+            <textarea
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              placeholder="Escribe aquí tu feedback…"
+            />
+            <button onClick={saveComment}>Enviar</button>
+          </div>
         </div>
       )}
     </div>
