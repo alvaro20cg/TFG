@@ -1,0 +1,76 @@
+/* src/pages/EyeTrackerReview.css */
+
+.eyetracker-page {
+  padding: 20px;
+  background: #f9f9f9;
+  min-height: 100vh;
+}
+
+.back-btn {
+  background: #ff9a9e;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: background-color 0.3s, transform 0.3s;
+}
+.back-btn:hover {
+  background: #fad0c4;
+  transform: scale(1.05);
+}
+
+.eyetracker-page h2 {
+  margin-bottom: 20px;
+  font-size: 2em;
+  color: #333;
+}
+
+.round-block {
+  margin-bottom: 40px;
+}
+
+.round-block h3 {
+  margin-bottom: 10px;
+  color: #555;
+}
+
+/* contenedor relativo para imágenes + heatmap */
+.heatmap-over-container {
+  position: relative;
+  width: 100%;
+  height: 60vh;
+  border: 1px solid #ccc;
+  background: #fff;
+  overflow: hidden;
+}
+
+/* imágenes por detrás */
+.image-wrapper.review {
+  position: absolute;
+  z-index: 1;
+}
+.image-wrapper.review img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* div transparente por encima donde se inserta el canvas */
+.heatmap-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+
+.loading {
+  font-size: 1.2em;
+  color: #666;
+  text-align: center;
+}

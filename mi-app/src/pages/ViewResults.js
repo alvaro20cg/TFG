@@ -1,3 +1,4 @@
+// src/pages/ViewResults.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
@@ -7,6 +8,7 @@ import './ViewResults.css';
 const ViewResults = () => {
   const navigate = useNavigate();
   const [results, setResults] = useState([]);
+  const [heatmapTests, setHeatmapTests] = useState(new Set());
   const [filters, setFilters] = useState({
     id: '',
     test: '',
@@ -16,10 +18,11 @@ const ViewResults = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  // Para el modal de confirmación
+  // Modal de confirmación de borrado
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
+  // 1) Carga la lista de tests con sus resultados
   useEffect(() => {
     const fetchResults = async () => {
       const { data, error } = await supabase
@@ -34,6 +37,7 @@ const ViewResults = () => {
           trail_comments ( comment )
         `)
         .order('created_at', { ascending: false });
+
       if (error) {
         console.error('Error cargando resultados:', error);
       } else {
@@ -44,17 +48,33 @@ const ViewResults = () => {
     fetchResults();
   }, []);
 
+  // 2) Carga los test_id que tienen al menos una ronda en round_data
+  useEffect(() => {
+    const fetchHeatmapTests = async () => {
+      const { data, error } = await supabase
+        .from('round_data')
+        .select('test_id', { distinct: true });
+
+      if (error) {
+        console.error('Error cargando round_data:', error);
+      } else {
+        setHeatmapTests(new Set(data.map(r => r.test_id)));
+      }
+    };
+    fetchHeatmapTests();
+  }, []);
+
   const handleFilterChange = e => {
     const { name, value } = e.target;
     setFilters(f => ({ ...f, [name]: value }));
   };
 
-  // Opciones para desplegables
+  // Opciones para filtros
   const idOptions     = [...new Set(results.map(r => r.id.toString()))];
   const testOptions   = [...new Set(results.map(r => r.nombre))];
   const emailOptions  = [...new Set(results.map(r => r.users?.email).filter(Boolean))];
   const statusOptions = [...new Set(results.map(r => r.status))];
-  const dateOptions   = [...new Set(results.map(r => new Date(r.created_at).toISOString().slice(0,10)))]
+  const dateOptions   = [...new Set(results.map(r => new Date(r.created_at).toISOString().slice(0,10)))];
 
   const filteredResults = results.filter(row => {
     const rowDate = new Date(row.created_at).toISOString().slice(0,10);
@@ -77,12 +97,9 @@ const ViewResults = () => {
       return;
     }
 
-    // Construir partes seguras del nombre de archivo, eliminando espacios extra
     const safeTest  = row.nombre.trim().split(/\s+/).join('_');
     const safeFirst = row.users?.first_name?.trim().split(/\s+/).join('_') || '';
     const safeLast  = row.users?.last_name?.trim().split(/\s+/).join('_') || '';
-
-    // Solo incluir las partes no vacías
     const parts = [row.id, safeTest, safeFirst, safeLast].filter(p => p);
     const filename = parts.join('_') + '.csv';
 
@@ -143,6 +160,7 @@ const ViewResults = () => {
             <th>Aciertos</th>
             <th>Errores</th>
             <th>Comentario</th>
+            <th>Eye-Tracker</th>
             <th>Acciones</th>
           </tr>
           <tr className="filter-row">
@@ -176,7 +194,7 @@ const ViewResults = () => {
                 {dateOptions.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </th>
-            <th></th><th></th><th></th><th></th>
+            <th></th><th></th><th></th><th></th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -197,6 +215,17 @@ const ViewResults = () => {
                 <td>{result?.correct_count ?? '—'}</td>
                 <td>{result?.error_count   ?? '—'}</td>
                 <td>{hasComment ? 'Sí' : 'No'}</td>
+                <td>
+                  {heatmapTests.has(row.id) 
+                    ? <button
+                        className="heatmap-btn"
+                        onClick={() => navigate(`/eyetracker/${row.id}`)}
+                      >
+                        Ver Heatmap
+                      </button>
+                    : '—'
+                  }
+                </td>
                 <td className="actions-cell">
                   <button
                     className="export-btn"
@@ -215,7 +244,7 @@ const ViewResults = () => {
             );
           }) : (
             <tr>
-              <td colSpan="10">No hay tests que coincidan con los filtros。</td>
+              <td colSpan="11">No hay tests que coincidan con los filtros.</td>
             </tr>
           )}
         </tbody>
@@ -228,7 +257,7 @@ const ViewResults = () => {
       {showDeleteModal && (
         <div className="delete-modal-overlay" onClick={cancelDelete}>
           <div className="delete-modal" onClick={e => e.stopPropagation()}>
-            <p>¿Estás seguro que quieres eliminar el test？</p>
+            <p>¿Estás seguro que quieres eliminar el test?</p>
             <div className="modal-buttons">
               <button onClick={cancelDelete}>Cancelar</button>
               <button className="delete-btn" onClick={confirmDeleteTest}>Eliminar</button>

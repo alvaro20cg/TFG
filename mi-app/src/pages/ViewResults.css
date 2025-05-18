@@ -57,14 +57,16 @@
 /* Botones */
 .export-btn,
 .delete-btn,
-.back-btn {
+.back-btn,
+.heatmap-btn {
   background-color: #ff9a9e; color: #fff;
   border: none; border-radius: 30px;
   padding: 8px 16px; cursor: pointer;
   transition: background-color 0.3s, transform 0.3s;
 }
 .export-btn:hover,
-.back-btn:hover {
+.back-btn:hover,
+.heatmap-btn:hover {
   background-color: #fad0c4; transform: scale(1.05);
 }
 .delete-btn {

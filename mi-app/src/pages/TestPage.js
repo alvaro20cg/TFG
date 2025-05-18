@@ -20,7 +20,7 @@ const TestPage = () => {
   const navigate = useNavigate();
   const containerRef = useRef(null);
 
-  // Redirigir si no hay testId
+  // Redirect si no hay testId
   useEffect(() => {
     if (!state?.testId) navigate('/');
   }, [state, navigate]);
@@ -45,7 +45,93 @@ const TestPage = () => {
   const originalImages = currentRoundData.images;
   const targetFolder = currentRoundData.targetFolder;
 
-  // Precarga de imágenes
+  // ---- Helpers de Supabase ----
+  const saveRoundData = async () => {
+    // Filtrar datos de esta ronda según timestamp absoluto
+    const header = 'x,y,t\n';
+    const rows = eyeTrackingData
+      .filter(d => d.t >= roundStartTime)
+      .map(d => `${d.x},${d.y},${d.t}`);
+    console.log(`Ronda ${currentRoundIndex+1} datos:`, rows.length, 'puntos');
+    const body = rows.join('\n');
+    const csvContent = header + body;
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const filePath = `${testId}/round_${currentRoundIndex + 1}.csv`;
+
+    // Subir CSV al bucket
+    const { error: uploadError } = await supabase
+      .storage
+      .from('eye-tracking-csvs')
+      .upload(filePath, blob, { contentType: 'text/csv', upsert: true });
+    if (uploadError) throw uploadError;
+
+    // Guardar metadata en round_data
+    const { error: dbError } = await supabase
+      .from('round_data')
+      .insert([{
+        test_id: testId,
+        round_number: currentRoundIndex + 1,
+        positions,
+        eye_csv_path: filePath
+      }]);
+    if (dbError) throw dbError;
+  };
+
+  // Funciones existentes
+  const saveCSV = async csv => {
+    if (!testId) return;
+    await supabase.from('csv_logs').insert([{ test_id: testId, csv_content: csv }]);
+  };
+  const saveResults = async (dur, corr, err) => {
+    if (!testId) return;
+    await supabase.from('test_results')
+      .insert([{ test_id: testId, duration: dur, correct_count: corr, error_count: err }]);
+  };
+  const markTestDone = async () => {
+    if (!testId) return;
+    await supabase.from('test').update({ status: 'finalizado' }).match({ id: testId });
+  };
+  const finalizeTest = async () => {
+    const csv = results.reduce(
+      (acc, r) => acc + `${r.round},${r.reactionTime},${r.result}\n`,
+      "round,reactionTime,result\n"
+    );
+    await saveCSV(csv);
+    const dur = Math.round((Date.now() - testStartTime) / 1000);
+    const corr = results.filter(r => r.result === 'acertado').length;
+    const err = results.filter(r => r.result === 'fallado').length;
+    await saveResults(dur, corr, err);
+  };
+  const downloadEyeTracking = () => {
+    if (!eyeTrackingData.length) return;
+    const header = "x,y,t\n";
+    const body = eyeTrackingData.map(d => `${d.x},${d.y},${d.t}`).join('\n');
+    const blob = new Blob([header + body], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `eyetracking_test_${testId}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    a.remove();
+  };
+  const saveComment = async () => {
+    if (!commentText.trim()) return alert('El comentario no puede estar vacío.');
+    const { error } = await supabase
+      .from('trail_comments')
+      .insert([{ test_id: testId, part: 'general', comment: commentText }]);
+    if (error) return alert('Error guardando comentario.');
+    await finalizeTest();
+    await markTestDone();
+    downloadEyeTracking();
+    setShowCommentModal(false);
+    setCommentSubmitted(true);
+    alert('¡Gracias por tu feedback! El CSV de eye-tracking se ha descargado.');
+    navigate('/userresults');
+  };
+
+  // ---- Lógica de rondas ----
   useEffect(() => {
     originalImages.forEach(img => {
       const preload = new Image();
@@ -53,7 +139,6 @@ const TestPage = () => {
     });
   }, [originalImages]);
 
-  // Selección de la imagen target
   const targetImage = useMemo(() => {
     const letter = emotionMapping[state.selectedEmotion];
     const found = originalImages.find(img => {
@@ -64,7 +149,6 @@ const TestPage = () => {
     return found || originalImages.find(img => img.folder === targetFolder);
   }, [originalImages, targetFolder, state.selectedEmotion]);
 
-  // Generar posiciones no solapadas
   const generateNonOverlappingPositions = () => {
     const c = containerRef.current;
     if (!c) return [];
@@ -95,7 +179,6 @@ const TestPage = () => {
     }));
   };
 
-  // Avanzar de ronda tras preview
   useEffect(() => {
     if (!showPreview) {
       setPositions(generateNonOverlappingPositions());
@@ -103,7 +186,6 @@ const TestPage = () => {
     }
   }, [currentRoundIndex, showPreview]);
 
-  // Cuenta atrás de preview
   useEffect(() => {
     let timer;
     if (showPreview) {
@@ -122,16 +204,13 @@ const TestPage = () => {
     return () => clearInterval(timer);
   }, [currentRoundIndex, showPreview]);
 
-  // === WebGazer + TFJS backend ===
+  // Inicializar WebGazer + TFJS con timestamp absoluto
   useEffect(() => {
     let webgazerInst = null;
     let lastTs = 0;
-
     const initWebGazer = async () => {
       await tf.setBackend('webgl');
       await tf.ready();
-
-      // Crear video oculto
       let vid = document.getElementById('webgazerVideo');
       if (!vid) {
         vid = document.createElement('video');
@@ -139,50 +218,42 @@ const TestPage = () => {
         vid.style.display = 'none';
         document.body.appendChild(vid);
       }
-
       const webgazerModule = await import('webgazer');
       const webgazer = webgazerModule.default;
       webgazerInst = webgazer;
       window.webgazer = webgazer;
-
       await webgazer.setRegression('ridge');
       await webgazer.setTracker('clmtrackr');
       await webgazer.begin();
-
-      // Ocultar preview cuando el video exista
-      const hidePreview = () => {
+      (function hidePreview() {
         if (document.getElementById('webgazerVideo')) {
           webgazer.showVideoPreview(false);
           webgazer.showPredictionPoints(false);
         } else {
           setTimeout(hidePreview, 200);
         }
-      };
-      hidePreview();
-
+      })();
       webgazer.setGazeListener((data, ts) => {
         if (data && ts - lastTs > 100) {
           lastTs = ts;
-          setEyeTrackingData(prev => [...prev, { x: data.x, y: data.y, t: ts }]);
+          // grabamos timestamp absoluto
+          setEyeTrackingData(prev => [
+            ...prev,
+            { x: data.x, y: data.y, t: Date.now() }
+          ]);
         }
       });
     };
-
     initWebGazer();
-
     return () => {
-      if (webgazerInst) {
-        webgazerInst.end();
-      }
+      if (webgazerInst) webgazerInst.end();
     };
   }, []);
 
-  // === Heatmap con guardias de null ===
+  // Render heatmap en vivo (opcional)
   useEffect(() => {
-    if (eyeTrackingData.length === 0) return;
-    const container = containerRef.current;
-    if (!container) return;
-    const heatmapContainer = container.querySelector('.heatmap-container');
+    if (!containerRef.current) return;
+    const heatmapContainer = containerRef.current.querySelector('.heatmap-container');
     if (!heatmapContainer) return;
     const hm = heatmap.create({
       container: heatmapContainer,
@@ -195,66 +266,8 @@ const TestPage = () => {
     hm.setData({ max: 1, data: points });
   }, [eyeTrackingData]);
 
-  // --- Supabase y lógica del test ---
-  const saveCSV = async csv => {
-    if (!testId) return;
-    await supabase.from('csv_logs').insert([{ test_id: testId, csv_content: csv }]);
-  };
-  const saveResults = async (dur, corr, err) => {
-    if (!testId) return;
-    await supabase.from('test_results')
-      .insert([{ test_id: testId, duration: dur, correct_count: corr, error_count: err }]);
-  };
-  const markTestDone = async () => {
-    if (!testId) return;
-    await supabase.from('test').update({ status: 'finalizado' }).match({ id: testId });
-  };
-
-  const finalizeTest = async () => {
-    const csv = results.reduce(
-      (acc, r) => acc + `${r.round},${r.reactionTime},${r.result}\n`,
-      "round,reactionTime,result\n"
-    );
-    await saveCSV(csv);
-    const dur = Math.round((Date.now() - testStartTime) / 1000);
-    const corr = results.filter(r => r.result === 'acertado').length;
-    const err = results.filter(r => r.result === 'fallado').length;
-    await saveResults(dur, corr, err);
-  };
-
-  // Descarga CSV de eye-tracking
-  const downloadEyeTracking = () => {
-    if (!eyeTrackingData.length) return;
-    const header = "x,y,t\n";
-    const csv = eyeTrackingData.reduce((acc, d) => acc + `${d.x},${d.y},${d.t}\n`, header);
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `eyetracking_test_${testId}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    URL.revokeObjectURL(url);
-    a.remove();
-  };
-
-  // Guarda comentario, resultados y dispara descarga
-  const saveComment = async () => {
-    if (!commentText.trim()) return alert('El comentario no puede estar vacío.');
-    const { error } = await supabase
-      .from('trail_comments')
-      .insert([{ test_id: testId, part: 'general', comment: commentText }]);
-    if (error) return alert('Error guardando comentario.');
-    await finalizeTest();
-    await markTestDone();
-    downloadEyeTracking();
-    setShowCommentModal(false);
-    setCommentSubmitted(true);
-    alert('¡Gracias por tu feedback! El CSV de eye-tracking se ha descargado.');
-    navigate('/userresults');
-  };
-
-  const handleImageClick = img => {
+  // Manejar clic en imagen
+  const handleImageClick = async img => {
     if (showPreview) return;
     const rt = Math.round((Date.now() - roundStartTime) / 1000);
     const ok = img.id === targetImage.id;
@@ -263,6 +276,18 @@ const TestPage = () => {
       reactionTime: rt,
       result: ok ? 'acertado' : 'fallado'
     }]);
+
+    // Guardar datos de ronda
+    try {
+      await saveRoundData();
+    } catch (err) {
+      console.error('Error guardando datos de ronda:', err);
+      alert('Hubo un error al guardar los datos de esta ronda.');
+      return;
+    }
+
+    // Limpiar buffer y avanzar
+    setEyeTrackingData([]);
     if (currentRoundIndex < totalRounds - 1) {
       setCurrentRoundIndex(i => i + 1);
       setShowPreview(true);
@@ -276,7 +301,9 @@ const TestPage = () => {
       <div className="testpage-header">
         <h2>Ronda {currentRoundIndex + 1} / {totalRounds}</h2>
         <div className="target-info">Busca: {targetFolder}</div>
-        <button className="cancel-btn" onClick={() => navigate('/userresults')}>Cancelar Test</button>
+        <button className="cancel-btn" onClick={() => navigate('/userresults')}>
+          Cancelar Test
+        </button>
       </div>
 
       {showPreview && targetImage ? (
