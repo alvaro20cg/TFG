@@ -47,14 +47,12 @@ const TestPage = () => {
 
   // ---- Helpers de Supabase ----
   const saveRoundData = async () => {
-    // Filtrar datos de esta ronda según timestamp absoluto
+    // Filtrar datos de esta ronda según timestamp
     const header = 'x,y,t\n';
     const rows = eyeTrackingData
       .filter(d => d.t >= roundStartTime)
       .map(d => `${d.x},${d.y},${d.t}`);
-    console.log(`Ronda ${currentRoundIndex+1} datos:`, rows.length, 'puntos');
-    const body = rows.join('\n');
-    const csvContent = header + body;
+    const csvContent = header + rows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const filePath = `${testId}/round_${currentRoundIndex + 1}.csv`;
 
@@ -77,20 +75,23 @@ const TestPage = () => {
     if (dbError) throw dbError;
   };
 
-  // Funciones existentes
   const saveCSV = async csv => {
     if (!testId) return;
     await supabase.from('csv_logs').insert([{ test_id: testId, csv_content: csv }]);
   };
+
   const saveResults = async (dur, corr, err) => {
     if (!testId) return;
-    await supabase.from('test_results')
+    await supabase
+      .from('test_results')
       .insert([{ test_id: testId, duration: dur, correct_count: corr, error_count: err }]);
   };
+
   const markTestDone = async () => {
     if (!testId) return;
     await supabase.from('test').update({ status: 'finalizado' }).match({ id: testId });
   };
+
   const finalizeTest = async () => {
     const csv = results.reduce(
       (acc, r) => acc + `${r.round},${r.reactionTime},${r.result}\n`,
@@ -102,20 +103,7 @@ const TestPage = () => {
     const err = results.filter(r => r.result === 'fallado').length;
     await saveResults(dur, corr, err);
   };
-  const downloadEyeTracking = () => {
-    if (!eyeTrackingData.length) return;
-    const header = "x,y,t\n";
-    const body = eyeTrackingData.map(d => `${d.x},${d.y},${d.t}`).join('\n');
-    const blob = new Blob([header + body], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `eyetracking_test_${testId}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    URL.revokeObjectURL(url);
-    a.remove();
-  };
+
   const saveComment = async () => {
     if (!commentText.trim()) return alert('El comentario no puede estar vacío.');
     const { error } = await supabase
@@ -124,15 +112,15 @@ const TestPage = () => {
     if (error) return alert('Error guardando comentario.');
     await finalizeTest();
     await markTestDone();
-    downloadEyeTracking();
     setShowCommentModal(false);
     setCommentSubmitted(true);
-    alert('¡Gracias por tu feedback! El CSV de eye-tracking se ha descargado.');
+    alert('¡Gracias por tu feedback!');
     navigate('/userresults');
   };
 
   // ---- Lógica de rondas ----
   useEffect(() => {
+    // Pre-carga de imágenes
     originalImages.forEach(img => {
       const preload = new Image();
       preload.src = img.url;
@@ -204,13 +192,14 @@ const TestPage = () => {
     return () => clearInterval(timer);
   }, [currentRoundIndex, showPreview]);
 
-  // Inicializar WebGazer + TFJS con timestamp absoluto
+  // ---- Inicializar WebGazer + TFJS y grabar coordenadas relativas ----
   useEffect(() => {
     let webgazerInst = null;
     let lastTs = 0;
     const initWebGazer = async () => {
       await tf.setBackend('webgl');
       await tf.ready();
+
       let vid = document.getElementById('webgazerVideo');
       if (!vid) {
         vid = document.createElement('video');
@@ -218,6 +207,7 @@ const TestPage = () => {
         vid.style.display = 'none';
         document.body.appendChild(vid);
       }
+
       const webgazerModule = await import('webgazer');
       const webgazer = webgazerModule.default;
       webgazerInst = webgazer;
@@ -225,22 +215,23 @@ const TestPage = () => {
       await webgazer.setRegression('ridge');
       await webgazer.setTracker('clmtrackr');
       await webgazer.begin();
-      (function hidePreview() {
-        if (document.getElementById('webgazerVideo')) {
-          webgazer.showVideoPreview(false);
-          webgazer.showPredictionPoints(false);
-        } else {
-          setTimeout(hidePreview, 200);
-        }
-      })();
+
+      webgazer.showVideoPreview(false);
+      webgazer.showPredictionPoints(false);
+
       webgazer.setGazeListener((data, ts) => {
+        if (!containerRef.current) return;
         if (data && ts - lastTs > 100) {
           lastTs = ts;
-          // grabamos timestamp absoluto
-          setEyeTrackingData(prev => [
-            ...prev,
-            { x: data.x, y: data.y, t: Date.now() }
-          ]);
+          const rect = containerRef.current.getBoundingClientRect();
+          const relX = (data.x - rect.left) / rect.width;
+          const relY = (data.y - rect.top) / rect.height;
+          if (relX >= 0 && relX <= 1 && relY >= 0 && relY <= 1) {
+            setEyeTrackingData(prev => [
+              ...prev,
+              { x: relX, y: relY, t: Date.now() }
+            ]);
+          }
         }
       });
     };
@@ -250,7 +241,7 @@ const TestPage = () => {
     };
   }, []);
 
-  // Render heatmap en vivo (opcional)
+  // ---- Render heatmap en vivo ----
   useEffect(() => {
     if (!containerRef.current) return;
     const heatmapContainer = containerRef.current.querySelector('.heatmap-container');
@@ -262,11 +253,15 @@ const TestPage = () => {
       minOpacity: 0.1,
       blur: 0.9
     });
-    const points = eyeTrackingData.map(d => ({ x: d.x, y: d.y, value: 1 }));
+    const points = eyeTrackingData.map(d => ({
+      x: d.x * heatmapContainer.clientWidth,
+      y: d.y * heatmapContainer.clientHeight,
+      value: 1
+    }));
     hm.setData({ max: 1, data: points });
   }, [eyeTrackingData]);
 
-  // Manejar clic en imagen
+  // ---- Manejar clic en imagen ----
   const handleImageClick = async img => {
     if (showPreview) return;
     const rt = Math.round((Date.now() - roundStartTime) / 1000);
@@ -277,7 +272,6 @@ const TestPage = () => {
       result: ok ? 'acertado' : 'fallado'
     }]);
 
-    // Guardar datos de ronda
     try {
       await saveRoundData();
     } catch (err) {
@@ -286,7 +280,6 @@ const TestPage = () => {
       return;
     }
 
-    // Limpiar buffer y avanzar
     setEyeTrackingData([]);
     if (currentRoundIndex < totalRounds - 1) {
       setCurrentRoundIndex(i => i + 1);

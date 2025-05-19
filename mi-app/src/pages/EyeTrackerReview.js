@@ -14,75 +14,51 @@ export default function EyeTrackerReview() {
   const heatmapRefs = useRef({});
   const heatmapInstances = useRef({});
 
-  // 1) Cargo configuración y metadatos
   useEffect(() => {
     async function loadAll() {
-      const { data: testRec, error: cfgErr } = await supabase
+      const { data: testRec } = await supabase
         .from('test')
         .select('configuration')
         .eq('id', testId)
         .single();
-      if (!cfgErr) setConfigRounds(testRec.configuration?.rounds || []);
+      setConfigRounds(testRec.configuration?.rounds || []);
 
-      const { data: rd, error: rdErr } = await supabase
+      const { data: rd } = await supabase
         .from('round_data')
         .select('round_number, positions, eye_csv_path')
         .eq('test_id', testId)
         .order('round_number', { ascending: true });
-      if (!rdErr) setRoundsData(rd);
+      setRoundsData(rd);
     }
     loadAll();
   }, [testId]);
 
-  // 2) Dibujo cada heatmap, ajustando coordenadas
   useEffect(() => {
-    roundsData.forEach((round) => {
+    roundsData.forEach(round => {
       const key = `r${round.round_number}`;
       const container = heatmapRefs.current[key];
       if (!container) return;
 
       (async () => {
-        // firma URL del CSV
-        const { data: urlData, error: urlErr } = await supabase
+        const { data: urlData } = await supabase
           .storage
           .from('eye-tracking-csvs')
           .createSignedUrl(round.eye_csv_path, 3600);
-        if (urlErr) {
-          console.error('Error al generar URL firmada:', urlErr);
-          return;
-        }
-        const signedUrl = urlData.signedUrl;
-
-        // descargo CSV
-        const raw = await fetch(signedUrl).then((r) => r.text());
+        const raw = await fetch(urlData.signedUrl).then(r => r.text());
         const lines = raw.trim().split('\n').slice(1);
         if (!lines.length) return;
 
-        // obtengo bbox del contenedor (sin scroll)
+        // Aplicamos la escala de nuevo: relX * ancho, relY * alto
         const rect = container.getBoundingClientRect();
-        const offsetX = rect.left;
-        const offsetY = rect.top;
-        const width = rect.width;
-        const height = rect.height;
+        const points = lines.map(line => {
+          const [relX, relY] = line.split(',').map(Number);
+          return {
+            x: Math.round(relX * rect.width),
+            y: Math.round(relY * rect.height),
+            value: 1
+          };
+        });
 
-        // parseo, corrijo y filtro coordenadas
-        const points = lines
-          .map((line) => {
-            const [absX, absY] = line.split(',').map(Number);
-            const x = Math.round(absX - offsetX);
-            const y = Math.round(absY - offsetY);
-            return { x, y, value: 1 };
-          })
-          .filter((p) => p.x >= 0 && p.x <= width && p.y >= 0 && p.y <= height);
-
-        if (points.length === 0) {
-          console.warn(`Ronda ${round.round_number}: no hay puntos dentro del contenedor`, {
-            total: lines.length,
-            filtered: points.length,
-          });
-        }
-
-        // creo o reutilizo instancia de heatmap
         let hm = heatmapInstances.current[key];
         if (!hm) {
           hm = heatmap.create({
@@ -90,16 +66,12 @@ export default function EyeTrackerReview() {
             radius: 30,
             maxOpacity: 0.6,
             minOpacity: 0.1,
-            blur: 0.9,
+            blur: 0.9
           });
           heatmapInstances.current[key] = hm;
         }
 
-        // asigno datos al heatmap
-        hm.setData({
-          max: Math.max(...points.map((p) => p.value), 1),
-          data: points,
-        });
+        hm.setData({ max: 1, data: points });
       })();
     });
   }, [roundsData]);
@@ -115,7 +87,7 @@ export default function EyeTrackerReview() {
       </button>
       <h2>Revisión Eye-Tracker: Test {testId}</h2>
 
-      {roundsData.map((round) => {
+      {roundsData.map(round => {
         const cfg = configRounds[round.round_number - 1] || { images: [] };
         return (
           <div key={round.round_number} className="round-block">
@@ -130,11 +102,9 @@ export default function EyeTrackerReview() {
                   <img src={img.url} alt={img.file || `Imagen ${idx + 1}`} />
                 </div>
               ))}
-
-              {/* este es el div donde se pintará el canvas del heatmap */}
               <div
                 className="heatmap-canvas"
-                ref={(el) => {
+                ref={el => {
                   heatmapRefs.current[`r${round.round_number}`] = el;
                 }}
               />
