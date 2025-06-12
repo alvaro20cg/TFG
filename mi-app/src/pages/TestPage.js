@@ -199,14 +199,14 @@ const TestPage = () => {
     const initWebGazer = async () => {
       await tf.setBackend('webgl');
       await tf.ready();
-
-      let vid = document.getElementById('webgazerVideo');
-      if (!vid) {
-        vid = document.createElement('video');
-        vid.id = 'webgazerVideo';
-        vid.style.display = 'none';
-        document.body.appendChild(vid);
-      }
+      // Si quieres usar video, descomenta las siguientes líneas
+      //let vid = document.getElementById('webgazerVideo');
+      //if (!vid) {
+        //vid = document.createElement('video');
+        //vid.id = 'webgazerVideo';
+        //vid.style.display = 'none';
+        //document.body.appendChild(vid);
+      //}
 
       const webgazerModule = await import('webgazer');
       const webgazer = webgazerModule.default;
@@ -316,7 +316,7 @@ const TestPage = () => {
               onClick={() => handleImageClick(img)}
             >
               <img src={img.url} alt={`Imagen ${img.id}`} />
-              <p>{img.file}</p>
+              {/*<p>{img.file}</p>*/}
             </div>
           ))}
         </div>

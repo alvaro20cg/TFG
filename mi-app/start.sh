@@ -6,5 +6,4 @@ if [ "$(hostname)" = "DESKTOP-O3U7NPU" ]; then
 else
   cd /mnt/c/Users/alvar/Desktop/Proyecto/TFG/mi-app
 fi
-
 yarn start
